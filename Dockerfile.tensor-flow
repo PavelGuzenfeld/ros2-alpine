@@ -3,7 +3,8 @@
 # Target: Jetson Xavier with JetPack 5.1 (L4T r35.2.1)
 # Base OS: Alpine 3.12 (to ensure Python 3.8 compatibility)
 #
-# This version corrects the package names for the NVIDIA libraries.
+# This version adds the public GPG key for the NVIDIA Jetson apt repository
+# to resolve signature verification errors.
 
 # =========================================================================
 # Stage 1: glibc-Ready Alpine Base
@@ -44,31 +45,39 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Add NVIDIA's official CUDA repository for ARM64 (aarch64)
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/arm64/cuda-keyring_1.1-1_all.deb && \
-    dpkg -i cuda-keyring_1.1-1_all.deb && \
-    apt-get update
+    dpkg -i cuda-keyring_1.1-1_all.deb
+
+# Add the NVIDIA Jetson repository for L4T R35.2 (JetPack 5.1)
+RUN echo "deb https://repo.download.nvidia.com/jetson/common r35.2 main" > /etc/apt/sources.list.d/nvidia-jetson.list && \
+    echo "deb https://repo.download.nvidia.com/jetson/t234 r35.2 main" >> /etc/apt/sources.list.d/nvidia-jetson.list
+
+# Add the public key for the Jetson repository to resolve signature errors [3]
+RUN wget -qO - https://repo.download.nvidia.com/jetson/jetson-ota-public.asc | apt-key add -
+
+# Update package lists to include all new repositories
+RUN apt-get update
 
 # Create a staging directory for the extracted libraries
 RUN mkdir -p /nvidia_libs
 
 # Download (but do not install) the required runtime packages.
-# The package names have been corrected to match the official repository.
 RUN apt-get download \
-    cuda-cudart-11-4 \
+    cuda-runtime-11-4 \
     libcublas-11-4 \
     libcudnn8 \
     libnvinfer8 \
     libnvinfer-plugin8 \
     libcusolver-11-4 \
     libcusparse-11-4 \
-    cuda-nvrtc-11-4 && \
-    dpkg -x cuda-cudart-11-4*.deb /nvidia_libs && \
+    libnvrtc-11-4 && \
+    dpkg -x cuda-runtime-11-4*.deb /nvidia_libs && \
     dpkg -x libcublas-11-4*.deb /nvidia_libs && \
     dpkg -x libcudnn8*.deb /nvidia_libs && \
     dpkg -x libnvinfer8*.deb /nvidia_libs && \
     dpkg -x libnvinfer-plugin8*.deb /nvidia_libs && \
     dpkg -x libcusolver-11-4*.deb /nvidia_libs && \
     dpkg -x libcusparse-11-4*.deb /nvidia_libs && \
-    dpkg -x cuda-nvrtc-11-4*.deb /nvidia_libs
+    dpkg -x libnvrtc-11-4*.deb /nvidia_libs
 
 # =========================================================================
 # Stage 3: Python Environment and TensorFlow Wheel Installation
