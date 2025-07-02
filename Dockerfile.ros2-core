@@ -29,8 +29,7 @@ RUN apk add --no-cache \
     swig \
     cython \
     py3-wheel \
-    py3-pybind11-dev \
-    pybind11-dev
+    py3-pybind11-dev
 
 # Install Python build tools
 ENV PYTHONWARNINGS=ignore::UserWarning:setuptools._distutils.dist
