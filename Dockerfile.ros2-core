@@ -1,4 +1,4 @@
-# ROS 2 Jazzy Alpine Linux Build - FIXED VERSION
+# ROS 2 Jazzy Alpine Linux Build - FINAL FIXED VERSION
 FROM alpine:latest AS builder
 
 USER root
@@ -49,7 +49,7 @@ RUN pip3 install --break-system-packages --quiet \
 
 WORKDIR /ros2_ws
 
-# Clone ROS 2 source packages - ADDED MISSING RPYUTILS
+# Clone ROS 2 source packages
 RUN mkdir -p src && cd src && \
     echo "Cloning ROS 2 Jazzy source packages..." && \
     git clone https://github.com/ament/ament_package.git && \
@@ -120,9 +120,13 @@ RUN echo "=== Building Ament Build System ===" && \
         --packages-up-to \
             ament_cmake \
             ament_lint_common \
+            ament_mypy \
+            ament_index_python \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
+            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+            -DPython3_EXECUTABLE=/usr/bin/python3 \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+'
@@ -141,7 +145,7 @@ RUN echo "=== Building External Dependencies ===" && \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+'
 
-# Build Stage 4: Build rpyutils FIRST (needed for Python bindings)
+# Build Stage 4: Build rpyutils (now that ament_mypy is available)
 RUN echo "=== Building rpyutils (Python utilities) ===" && \
     bash -c 'source install/setup.bash && \
     colcon build \
