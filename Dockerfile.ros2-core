@@ -138,6 +138,7 @@ RUN echo "=== Building External Dependencies ===" && \
         --packages-up-to \
             foonathan_memory_vendor \
             fastcdr \
+            libyaml_vendor \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
@@ -188,8 +189,6 @@ RUN echo "=== Building Core ROS ===" && \
             builtin_interfaces \
             std_msgs \
             rclpy \
-        --packages-skip \
-            libyaml_vendor \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
