@@ -1,8 +1,6 @@
-# ROS 2 Jazzy Alpine Linux Build
-# Multi-stage build for minimal ROS 2 core installation
+# ROS 2 Jazzy Alpine Linux Build - FIXED VERSION
 FROM alpine:latest AS builder
 
-# Install build dependencies
 USER root
 RUN apk add --no-cache \
     bash \
@@ -29,9 +27,9 @@ RUN apk add --no-cache \
     swig \
     cython \
     py3-wheel \
-    py3-pybind11-dev
+    py3-pybind11-dev \
+    libc-dev
 
-# Install Python build tools
 ENV PYTHONWARNINGS=ignore::UserWarning:setuptools._distutils.dist
 RUN pip3 install --break-system-packages --quiet \
     colcon-common-extensions \
@@ -45,24 +43,21 @@ RUN pip3 install --break-system-packages --quiet \
     cython \
     cpplint \
     pycodestyle \
-    pydocstyle
+    pydocstyle \
+    catkin-pkg \
+    distlib
 
-# Create workspace
 WORKDIR /ros2_ws
 
-# Clone ROS 2 source packages
+# Clone ROS 2 source packages - ADDED MISSING RPYUTILS
 RUN mkdir -p src && cd src && \
     echo "Cloning ROS 2 Jazzy source packages..." && \
-    \
-    # Essential ament build tools
     git clone https://github.com/ament/ament_package.git && \
     git clone https://github.com/ament/ament_cmake.git && \
     git clone https://github.com/ament/ament_index.git && \
     git clone https://github.com/ament/googletest.git && \
     git clone https://github.com/ament/ament_lint.git && \
     git clone https://github.com/ros2/ament_cmake_ros.git && \
-    \
-    # Core ROS 2 packages
     git clone https://github.com/ros2/rcutils.git && \
     git clone https://github.com/ros2/rcpputils.git && \
     git clone https://github.com/ros2/rmw.git && \
@@ -72,8 +67,8 @@ RUN mkdir -p src && cd src && \
     git clone https://github.com/ros2/ros2cli.git && \
     git clone https://github.com/ros2/common_interfaces.git && \
     git clone https://github.com/ros2/libyaml_vendor.git && \
-    \
-    # Additional dependencies
+    git clone https://github.com/ros2/rosidl_python.git && \
+    git clone https://github.com/ros2/rpyutils.git && \
     git clone https://github.com/ros2/rosidl_core.git && \
     git clone https://github.com/ros2/rosidl_defaults.git && \
     git clone https://github.com/ros2/rosidl_dynamic_typesupport.git && \
@@ -81,8 +76,6 @@ RUN mkdir -p src && cd src && \
     git clone https://github.com/ros2/rosidl_typesupport.git && \
     git clone https://github.com/ros2/unique_identifier_msgs.git && \
     git clone https://github.com/ros2/rcl_interfaces.git && \
-    \
-    # RMW implementations
     git clone https://github.com/ros2/rmw_implementation.git && \
     git clone https://github.com/ros2/rmw_fastrtps.git && \
     git clone https://github.com/ros2/rmw_dds_common.git && \
@@ -91,10 +84,8 @@ RUN mkdir -p src && cd src && \
     git clone https://github.com/eProsima/Fast-CDR.git && \
     git clone https://github.com/eProsima/foonathan_memory_vendor.git && \
     git clone https://github.com/ros2/rosidl_typesupport_fastrtps.git && \
-    \
     echo "Source packages cloned successfully"
 
-# Clean up test directories to reduce build time
 RUN cd src && \
     find . -name "*_test" -type d ! -path "./ament_cmake/ament_cmake_test*" ! -path "./ament_cmake/ament_cmake_gmock*" ! -path "./ament_cmake_ros/rmw_test_fixture*" -exec rm -rf {} + 2>/dev/null || true && \
     find . -name "*_tests" -type d -exec rm -rf {} + 2>/dev/null || true && \
@@ -104,8 +95,7 @@ RUN cd src && \
     find . -name "*benchmark*" -type d -exec rm -rf {} + 2>/dev/null || true && \
     echo "Test directories cleaned"
 
-# Configure build flags for Alpine/musl compatibility
-ENV MAKEFLAGS="-j1"
+ENV MAKEFLAGS="-j2"
 ENV CFLAGS="-Wno-int-conversion -Wno-incompatible-pointer-types -Wno-error"
 ENV CXXFLAGS="-Wno-error -Wno-deprecated-declarations"
 
@@ -121,11 +111,11 @@ RUN echo "=== Building Foundation Packages ===" && \
             -DBUILD_TESTING=OFF \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ 2>/dev/null || true
+        --event-handlers console_direct+
 
 # Build Stage 2: Ament build system
 RUN echo "=== Building Ament Build System ===" && \
-    bash -c 'if [ -f install/setup.bash ]; then source install/setup.bash; fi && \
+    bash -c 'source install/setup.bash && \
     colcon build \
         --packages-up-to \
             ament_cmake \
@@ -135,11 +125,11 @@ RUN echo "=== Building Ament Build System ===" && \
             -DBUILD_TESTING=OFF \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ 2>/dev/null || true'
+        --event-handlers console_direct+'
 
 # Build Stage 3: External dependencies
 RUN echo "=== Building External Dependencies ===" && \
-    bash -c 'if [ -f install/setup.bash ]; then source install/setup.bash; fi && \
+    bash -c 'source install/setup.bash && \
     colcon build \
         --packages-up-to \
             foonathan_memory_vendor \
@@ -149,79 +139,50 @@ RUN echo "=== Building External Dependencies ===" && \
             -DBUILD_TESTING=OFF \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ 2>/dev/null || true'
+        --event-handlers console_direct+'
 
-# Build Stage 4: Fast-DDS middleware
-RUN echo "=== Building Fast-DDS Middleware ===" && \
-    bash -c 'if [ -f install/setup.bash ]; then source install/setup.bash; fi && \
+# Build Stage 4: Build rpyutils FIRST (needed for Python bindings)
+RUN echo "=== Building rpyutils (Python utilities) ===" && \
+    bash -c 'source install/setup.bash && \
     colcon build \
-        --packages-up-to \
-            fastdds \
+        --packages-select \
+            rpyutils \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
-            -DBUILD_DOCUMENTATION=OFF \
-            -DCOMPILE_EXAMPLES=OFF \
-            -DEPSFAST_BUILD=ON \
+            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+            -DPython3_EXECUTABLE=/usr/bin/python3 \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ 2>/dev/null || true'
+        --event-handlers console_direct+'
 
-# Build Stage 5: Core ROS packages
-RUN echo "=== Building Core ROS Packages ===" && \
-    bash -c 'if [ -f install/setup.bash ]; then source install/setup.bash; fi && \
+# Build Stage 5: ROSIDL Core (AFTER rpyutils)
+RUN echo "=== Building ROSIDL Core ===" && \
+    bash -c 'source install/setup.bash && \
+    colcon build \
+        --packages-up-to \
+            rosidl_generator_py \
+            rosidl_adapter \
+            rosidl_cmake \
+            rosidl_parser \
+        --cmake-args \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF \
+            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+            -DPython3_EXECUTABLE=/usr/bin/python3 \
+            -DCMAKE_C_FLAGS="${CFLAGS}" \
+            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
+        --event-handlers console_direct+'
+
+# Build Stage 6: Core ROS packages with Python support
+RUN echo "=== Building Core ROS ===" && \
+    bash -c 'source install/setup.bash && \
     colcon build \
         --packages-up-to \
             rcutils \
-            rcpputils \
-            rosidl_default_runtime \
             rmw \
-            rmw_dds_common \
-            tracetools \
-            rosidl_dynamic_typesupport_fastrtps \
-            ament_index_cpp \
-        --packages-skip \
-            libyaml_vendor \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ 2>/dev/null || true'
-
-# Build Stage 6: RMW implementations
-RUN echo "=== Building RMW Implementations ===" && \
-    bash -c 'if [ -f install/setup.bash ]; then source install/setup.bash; fi && \
-    colcon build \
-        --packages-up-to \
-            rmw_fastrtps_cpp \
-            rmw_fastrtps_shared_cpp \
-            rmw_fastrtps_dynamic_cpp \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ 2>/dev/null || true'
-
-# Build Stage 7: RCL and Python bindings
-RUN echo "=== Building RCL and Python Bindings ===" && \
-    bash -c 'if [ -f install/setup.bash ]; then source install/setup.bash; fi && \
-    echo "Building RCL..." && \
-    colcon build \
-        --packages-up-to \
-            rcl \
-        --packages-skip \
-            libyaml_vendor \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ || echo "RCL build completed with warnings" && \
-    echo "Building RCLPY with Python bindings..." && \
-    colcon build \
-        --packages-select \
+            builtin_interfaces \
+            std_msgs \
             rclpy \
         --packages-skip \
             libyaml_vendor \
@@ -232,114 +193,9 @@ RUN echo "=== Building RCL and Python Bindings ===" && \
             -DPython3_EXECUTABLE=/usr/bin/python3 \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ || echo "RCLPY build completed with warnings"'
+        --event-handlers console_direct+'
 
-# Build Stage 8: Message interfaces with Python bindings
-RUN echo "=== Building Message Interfaces with Python Bindings ===" && \
-    bash -c 'if [ -f install/setup.bash ]; then source install/setup.bash; fi && \
-    echo "Building core message interfaces..." && \
-    colcon build \
-        --packages-up-to \
-            builtin_interfaces \
-            std_msgs \
-            rcl_interfaces \
-        --packages-skip \
-            libyaml_vendor \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
-            -DPython3_EXECUTABLE=/usr/bin/python3 \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ || echo "Core message interfaces completed with warnings" && \
-    echo "Building additional message interfaces..." && \
-    colcon build \
-        --packages-up-to \
-            geometry_msgs \
-            sensor_msgs \
-            diagnostic_msgs \
-            nav_msgs \
-            shape_msgs \
-            stereo_msgs \
-            trajectory_msgs \
-            visualization_msgs \
-        --packages-skip \
-            libyaml_vendor \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
-            -DPython3_EXECUTABLE=/usr/bin/python3 \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ || echo "Additional message interfaces completed with warnings"'
-
-# Build Stage 9: CLI tools and final components
-RUN echo "=== Building CLI Tools and Final Components ===" && \
-    bash -c 'if [ -f install/setup.bash ]; then source install/setup.bash; fi && \
-    echo "Building ros2cli and tools..." && \
-    colcon build \
-        --packages-up-to \
-            ros2cli \
-        --packages-skip \
-            libyaml_vendor \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
-            -DPython3_EXECUTABLE=/usr/bin/python3 \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ || echo "ros2cli build completed with warnings" && \
-    echo "Building additional CLI components..." && \
-    colcon build \
-        --packages-select \
-            ros2pkg \
-            ros2node \
-            ros2topic \
-            ros2service \
-            ros2param \
-        --packages-skip \
-            libyaml_vendor \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
-            -DPython3_EXECUTABLE=/usr/bin/python3 \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ || echo "Additional CLI tools completed with warnings"'
-
-# Build Stage 10: Final build with Python support
-RUN echo "=== Final Build Pass with Python Support ===" && \
-    bash -c 'if [ -f install/setup.bash ]; then source install/setup.bash; fi && \
-    colcon build \
-        --packages-skip \
-            libyaml_vendor \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
-            -DPython3_EXECUTABLE=/usr/bin/python3 \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --continue-on-error --event-handlers console_direct+ || echo "Final build completed with warnings"'
-
-# Set default RMW implementation
 ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-
-# Build summary
-RUN echo "=== Build Summary ===" && \
-    bash -c 'if [ -f install/setup.bash ]; then source install/setup.bash; fi && \
-    echo "Total packages built: $(ls install/ | wc -l)" && \
-    echo "Build verification..." && \
-    echo "Checking rclpy..." && \
-    python3 -c "import rclpy; print(\"✅ rclpy import: SUCCESS\")" 2>/dev/null || echo "⚠️ rclpy import: FAILED" && \
-    echo "Checking std_msgs..." && \
-    python3 -c "import std_msgs.msg; print(\"✅ std_msgs import: SUCCESS\")" 2>/dev/null || echo "⚠️ std_msgs import: FAILED" && \
-    echo "Checking ros2 CLI..." && \
-    if [ -f "/opt/ros/jazzy/ros2cli/bin/ros2" ]; then echo "✅ ros2 binary: FOUND"; else echo "⚠️ ros2 binary: NOT FOUND"; fi'
 
 # ============================================================================
 # Runtime Stage - Clean Alpine image with only necessary runtime components
@@ -365,56 +221,36 @@ RUN apk add --no-cache \
     tinyxml2 \
     yaml-cpp \
     yaml \
-    libxml2-utils \
     openssl \
     lttng-ust
 
-# Install minimal Python runtime dependencies
 ENV PYTHONWARNINGS=ignore::UserWarning:setuptools._distutils.dist
-RUN pip3 install --break-system-packages --quiet \
-    lark \
-    wheel
+RUN pip3 install --break-system-packages --quiet lark wheel
 
-# Create ROS installation directory
 RUN mkdir -p /opt/ros/jazzy
-
-# Copy built packages from builder stage
 COPY --from=builder /ros2_ws/install /opt/ros/jazzy
 
-# Set up ROS environment
 ENV ROS_VERSION=2 \
     ROS_DISTRO=jazzy \
     ROS_PYTHON_VERSION=3 \
     RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
-# Configure environment setup script
-RUN if [ -f /opt/ros/jazzy/setup.bash ]; then \
-        chmod +x /opt/ros/jazzy/setup.bash; \
-        echo "✅ Using colcon-generated setup script"; \
-    else \
-        echo "⚠️ Creating custom setup script"; \
-        echo '#!/bin/bash' > /opt/ros/jazzy/setup.bash; \
-        echo 'export ROS_VERSION=2' >> /opt/ros/jazzy/setup.bash; \
-        echo 'export ROS_DISTRO=jazzy' >> /opt/ros/jazzy/setup.bash; \
-        echo 'export ROS_PYTHON_VERSION=3' >> /opt/ros/jazzy/setup.bash; \
-        echo 'export RMW_IMPLEMENTATION=rmw_fastrtps_cpp' >> /opt/ros/jazzy/setup.bash; \
-        echo 'for dir in /opt/ros/jazzy/*/; do' >> /opt/ros/jazzy/setup.bash; \
-        echo '  if [ -d "$dir/lib/python3.12/site-packages" ]; then' >> /opt/ros/jazzy/setup.bash; \
-        echo '    export PYTHONPATH="$dir/lib/python3.12/site-packages:$PYTHONPATH"' >> /opt/ros/jazzy/setup.bash; \
-        echo '  fi' >> /opt/ros/jazzy/setup.bash; \
-        echo '  if [ -d "$dir/bin" ]; then' >> /opt/ros/jazzy/setup.bash; \
-        echo '    export PATH="$dir/bin:$PATH"' >> /opt/ros/jazzy/setup.bash; \
-        echo '  fi' >> /opt/ros/jazzy/setup.bash; \
-        echo '  if [ -d "$dir/lib" ]; then' >> /opt/ros/jazzy/setup.bash; \
-        echo '    export LD_LIBRARY_PATH="$dir/lib:$LD_LIBRARY_PATH"' >> /opt/ros/jazzy/setup.bash; \
-        echo '  fi' >> /opt/ros/jazzy/setup.bash; \
-        echo 'done' >> /opt/ros/jazzy/setup.bash; \
-        chmod +x /opt/ros/jazzy/setup.bash; \
-    fi
+RUN echo '#!/bin/bash' > /opt/ros/jazzy/setup.bash && \
+    echo 'export ROS_VERSION=2' >> /opt/ros/jazzy/setup.bash && \
+    echo 'export ROS_DISTRO=jazzy' >> /opt/ros/jazzy/setup.bash && \
+    echo 'export ROS_PYTHON_VERSION=3' >> /opt/ros/jazzy/setup.bash && \
+    echo 'export RMW_IMPLEMENTATION=rmw_fastrtps_cpp' >> /opt/ros/jazzy/setup.bash && \
+    echo 'for dir in /opt/ros/jazzy/*/; do' >> /opt/ros/jazzy/setup.bash && \
+    echo '  if [ -d "$dir/lib/python3.12/site-packages" ]; then' >> /opt/ros/jazzy/setup.bash && \
+    echo '    export PYTHONPATH="$dir/lib/python3.12/site-packages:$PYTHONPATH"' >> /opt/ros/jazzy/setup.bash && \
+    echo '  fi' >> /opt/ros/jazzy/setup.bash && \
+    echo '  if [ -d "$dir/bin" ]; then' >> /opt/ros/jazzy/setup.bash && \
+    echo '    export PATH="$dir/bin:$PATH"' >> /opt/ros/jazzy/setup.bash && \
+    echo '  fi' >> /opt/ros/jazzy/setup.bash && \
+    echo 'done' >> /opt/ros/jazzy/setup.bash && \
+    chmod +x /opt/ros/jazzy/setup.bash
 
-# Create default workspace
 RUN mkdir -p /workspace/src
 WORKDIR /workspace
 
-# Default command
-CMD ["/bin/bash", "-c", "source /opt/ros/jazzy/setup.bash && echo 'ROS 2 Jazzy Alpine ready! 🚀' && /bin/bash"]
+CMD ["/bin/bash", "-c", "source /opt/ros/jazzy/setup.bash && echo 'ROS 2 Jazzy Alpine ready!' && /bin/bash"]
