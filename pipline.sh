@@ -9,7 +9,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_SCRIPT="$SCRIPT_DIR/build.sh"
 TEST_SCRIPT="$SCRIPT_DIR/test.sh"
-DOCKERFILE="$SCRIPT_DIR/Dockerfile.ros2-jazzy-alpine"
+DOCKERFILE="$SCRIPT_DIR/Dockerfile.ros2-core"  # Fixed: Changed from Dockerfile.ros2-jazzy-alpine
 
 # Colors for output
 RED='\033[0;31m'
@@ -63,7 +63,7 @@ check_prerequisites() {
     fi
     
     if [ ! -f "$DOCKERFILE" ]; then
-        missing_files+=("Dockerfile.ros2-jazzy-alpine")
+        missing_files+=("Dockerfile.ros2-core")  # Fixed: Updated error message
     fi
     
     if [ ${#missing_files[@]} -gt 0 ]; then
@@ -109,6 +109,14 @@ show_system_info() {
     echo "  Available disk space: $(df -h . | awk 'NR==2 {print $4}')"
     echo "  Available memory: $(free -h | grep Mem | awk '{print $7}' 2>/dev/null || echo 'N/A')"
     echo "  CPU cores: $(nproc 2>/dev/null || echo 'N/A')"
+}
+
+# Clean Docker build cache
+clean_docker_cache() {
+    log_info "Cleaning Docker build cache..."
+    docker builder prune -f || true
+    docker system prune -f || true
+    log_success "Docker cache cleaned"
 }
 
 # Run build stage
@@ -248,17 +256,18 @@ run_full_pipeline() {
     log_info "Started: $pipeline_start_time"
     log_info "Completed: $(date)"
     
-    # Final image info
-    if docker images ros2-jazzy-alpine:latest --format "table {{.Repository}}:{{.Tag}}" | grep -q "ros2-jazzy-alpine:latest"; then
-        IMAGE_SIZE=$(docker images ros2-jazzy-alpine:latest --format "{{.Size}}")
+    # Final image info - Updated to match build.sh output
+    if docker images ros2-jazzy-alpine:core --format "table {{.Repository}}:{{.Tag}}" | grep -q "ros2-jazzy-alpine:core"; then
+        IMAGE_SIZE=$(docker images ros2-jazzy-alpine:core --format "{{.Size}}")
         log_success "🎉 ROS 2 Jazzy Alpine container ready!"
-        log_info "Image: ros2-jazzy-alpine:latest ($IMAGE_SIZE)"
+        log_info "Image: ros2-jazzy-alpine:core ($IMAGE_SIZE)"
+        log_info "Also tagged as: ros2-jazzy-alpine:complete"
         echo ""
         log_info "To run the container:"
-        echo "  docker run -it ros2-jazzy-alpine:latest"
+        echo "  docker run -it ros2-jazzy-alpine:core"
         echo ""
         log_info "To run with GUI support:"
-        echo "  docker run -it --network host ros2-jazzy-alpine:latest"
+        echo "  docker run -it --network host ros2-jazzy-alpine:core"
     else
         log_error "Final image verification failed"
         exit 1
@@ -286,7 +295,7 @@ main() {
             ;;
         --clean)
             log_header "Clean Build Mode"
-            "$BUILD_SCRIPT" --clean
+            clean_docker_cache
             run_full_pipeline false false
             ;;
         --interactive)
