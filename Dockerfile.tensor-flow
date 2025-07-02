@@ -3,8 +3,7 @@
 # Target: Jetson Xavier with JetPack 5.1 (L4T r35.2.1)
 # Base OS: Alpine 3.12 (to ensure Python 3.8 compatibility)
 #
-# This version corrects issues with glibc installation, SSL certificates,
-# and Python/TensorFlow version mismatches.
+# This version corrects the package names for the NVIDIA libraries.
 
 # =========================================================================
 # Stage 1: glibc-Ready Alpine Base
@@ -16,7 +15,6 @@ FROM alpine:3.12 as builder_base
 
 # Install glibc compatibility layer. We only install the core glibc package
 # to avoid architecture-related trigger errors from glibc-bin on aarch64.
-# A specific, older glibc version is chosen for compatibility with Alpine 3.12.
 ENV GLIBC_VERSION=2.33-r0
 RUN apk add --no-cache \
     wget \
@@ -38,7 +36,6 @@ RUN apk add --no-cache libc6-compat
 FROM ubuntu:20.04 as downloader
 
 # Set non-interactive frontend and install prerequisite packages first.
-# This ensures ca-certificates are in place before making HTTPS requests.
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -46,7 +43,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg
 
 # Add NVIDIA's official CUDA repository for ARM64 (aarch64)
-# This uses the correct architecture for Jetson.
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/arm64/cuda-keyring_1.1-1_all.deb && \
     dpkg -i cuda-keyring_1.1-1_all.deb && \
     apt-get update
@@ -54,25 +50,25 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/arm
 # Create a staging directory for the extracted libraries
 RUN mkdir -p /nvidia_libs
 
-# Download (but do not install) the required runtime packages for CUDA 11.4,
-# cuDNN 8, and TensorRT 8. Then, extract their contents.
+# Download (but do not install) the required runtime packages.
+# The package names have been corrected to match the official repository.
 RUN apt-get download \
+    cuda-cudart-11-4 \
     libcublas-11-4 \
-    libcudart-11-4 \
     libcudnn8 \
     libnvinfer8 \
     libnvinfer-plugin8 \
     libcusolver-11-4 \
     libcusparse-11-4 \
-    libnvrtc-11-4 && \
+    cuda-nvrtc-11-4 && \
+    dpkg -x cuda-cudart-11-4*.deb /nvidia_libs && \
     dpkg -x libcublas-11-4*.deb /nvidia_libs && \
-    dpkg -x libcudart-11-4*.deb /nvidia_libs && \
     dpkg -x libcudnn8*.deb /nvidia_libs && \
     dpkg -x libnvinfer8*.deb /nvidia_libs && \
     dpkg -x libnvinfer-plugin8*.deb /nvidia_libs && \
     dpkg -x libcusolver-11-4*.deb /nvidia_libs && \
     dpkg -x libcusparse-11-4*.deb /nvidia_libs && \
-    dpkg -x libnvrtc-11-4*.deb /nvidia_libs
+    dpkg -x cuda-nvrtc-11-4*.deb /nvidia_libs
 
 # =========================================================================
 # Stage 3: Python Environment and TensorFlow Wheel Installation
@@ -94,7 +90,6 @@ RUN apk add --no-cache \
     openblas-dev
 
 # Install Python package dependencies required by NVIDIA's TensorFlow wheel
-# Versions are aligned with NVIDIA's recommendations for JetPack 5.1
 RUN python3 -m pip install --upgrade pip && \
     pip3 install --no-cache-dir \
     -U testresources setuptools==65.5.0 && \
@@ -113,15 +108,12 @@ RUN python3 -m pip install --upgrade pip && \
     packaging
 
 # Install the official NVIDIA TensorFlow wheel for JetPack 5.1 (L4T R35.2.1)
-# This wheel is built for Python 3.8 and CUDA 11.4.
-# The --extra-index-url is mandatory.
 RUN pip3 install --no-cache-dir --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v51 tensorflow==2.11.0+nv23.1
 
 # =========================================================================
 # Stage 4: Final Assembly and Optimization
 #
 # This final stage assembles the artifacts into the minimal production image.
-# It starts from a clean base to ensure no build tools are included.
 # =========================================================================
 FROM builder_base as final
 
