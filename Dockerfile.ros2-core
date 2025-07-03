@@ -45,7 +45,8 @@ RUN pip3 install --break-system-packages --quiet \
     pycodestyle \
     pydocstyle \
     catkin-pkg \
-    distlib
+    distlib \
+    vcstool
 
 WORKDIR /ros2_ws
 
