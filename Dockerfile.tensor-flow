@@ -3,7 +3,7 @@
 # Target: Jetson Xavier with JetPack 5.1 (L4T r35.2.1)
 # Base OS: Alpine 3.12 (to ensure Python 3.8 compatibility)
 #
-# This version pins Cython to <3.0 to fix h5py compilation errors.
+# This version uses --no-build-isolation to fix the h5py/Cython build error.
 
 # =========================================================================
 # Stage 1: glibc-Ready Alpine Base
@@ -87,7 +87,6 @@ RUN apt-get download \
 FROM builder_base as builder_tf
 
 # Install Python 3.8 (default in Alpine 3.12) and build dependencies
-# Added hdf5-dev to provide libhdf5.so for compiling h5py.
 RUN apk add --no-cache \
     python3 \
     python3-dev \
@@ -102,13 +101,14 @@ RUN apk add --no-cache \
 
 # Install Python package dependencies required by NVIDIA's TensorFlow wheel
 # We install Cython<3.0 first to ensure compatibility with h5py compilation.
+# We then use --no-build-isolation to force h5py to use the pre-installed Cython.
 RUN python3 -m pip install --upgrade pip && \
     pip3 install --no-cache-dir \
     setuptools==65.5.0 \
     numpy==1.21.1 \
     "Cython<3.0" \
     pkgconfig && \
-    pip3 install --no-cache-dir \
+    pip3 install --no-build-isolation --no-cache-dir \
     h5py==3.7.0 \
     future \
     mock \
