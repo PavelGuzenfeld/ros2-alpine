@@ -3,8 +3,8 @@
 # Target: Jetson Xavier with JetPack 5.1 (L4T r35.2.1)
 # Base OS: Alpine 3.12 (to ensure Python 3.8 compatibility)
 #
-# This version adds the public GPG key for the NVIDIA Jetson apt repository
-# to resolve signature verification errors.
+# This version adds python3-dev to the builder stage to allow pip to
+# compile C extensions for packages like numpy and h5py.
 
 # =========================================================================
 # Stage 1: glibc-Ready Alpine Base
@@ -51,7 +51,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/arm
 RUN echo "deb https://repo.download.nvidia.com/jetson/common r35.2 main" > /etc/apt/sources.list.d/nvidia-jetson.list && \
     echo "deb https://repo.download.nvidia.com/jetson/t234 r35.2 main" >> /etc/apt/sources.list.d/nvidia-jetson.list
 
-# Add the public key for the Jetson repository to resolve signature errors [3]
+# Add the public key for the Jetson repository to resolve signature errors
 RUN wget -qO - https://repo.download.nvidia.com/jetson/jetson-ota-public.asc | apt-key add -
 
 # Update package lists to include all new repositories
@@ -69,7 +69,7 @@ RUN apt-get download \
     libnvinfer-plugin8 \
     libcusolver-11-4 \
     libcusparse-11-4 \
-    libnvrtc-11-4 && \
+    cuda-nvrtc-11-4 && \
     dpkg -x cuda-runtime-11-4*.deb /nvidia_libs && \
     dpkg -x libcublas-11-4*.deb /nvidia_libs && \
     dpkg -x libcudnn8*.deb /nvidia_libs && \
@@ -77,7 +77,7 @@ RUN apt-get download \
     dpkg -x libnvinfer-plugin8*.deb /nvidia_libs && \
     dpkg -x libcusolver-11-4*.deb /nvidia_libs && \
     dpkg -x libcusparse-11-4*.deb /nvidia_libs && \
-    dpkg -x libnvrtc-11-4*.deb /nvidia_libs
+    dpkg -x cuda-nvrtc-11-4*.deb /nvidia_libs
 
 # =========================================================================
 # Stage 3: Python Environment and TensorFlow Wheel Installation
@@ -88,8 +88,10 @@ RUN apt-get download \
 FROM builder_base as builder_tf
 
 # Install Python 3.8 (default in Alpine 3.12) and build dependencies
+# Added python3-dev to provide Python.h for compiling C extensions.
 RUN apk add --no-cache \
     python3 \
+    python3-dev \
     py3-pip \
     build-base \
     gfortran \
