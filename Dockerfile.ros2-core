@@ -99,7 +99,7 @@ RUN cd src && \
 
 ENV MAKEFLAGS="-j2"
 ENV CFLAGS="-Wno-int-conversion -Wno-incompatible-pointer-types -Wno-error"
-ENV CXXFLAGS="-Wno-error -Wno-deprecated-declarations"
+ENV CXXFLAGS="-Wno-error -Wno-deprecated-declarations -Wno-stringop-overread" 
 
 # Build Stage 1: Foundation packages
 RUN echo "=== Building Foundation Packages ===" && \
