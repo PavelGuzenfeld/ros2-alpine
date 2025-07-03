@@ -76,6 +76,7 @@ RUN mkdir -p src && cd src && \
     git clone https://github.com/ros2/rosidl_typesupport.git && \
     git clone https://github.com/ros2/unique_identifier_msgs.git && \
     git clone https://github.com/ros2/rcl_interfaces.git && \
+    git clone https://github.com/ros2/rcl_logging.git && \
     git clone https://github.com/ros2/rmw_implementation.git && \
     git clone https://github.com/ros2/rmw_fastrtps.git && \
     git clone https://github.com/ros2/rmw_dds_common.git && \
