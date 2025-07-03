@@ -88,13 +88,14 @@ RUN apt-get download \
 FROM builder_base as builder_tf
 
 # Install Python 3.8 (default in Alpine 3.12) and build dependencies
-# Added python3-dev to provide Python.h for compiling C extensions.
+# Added hdf5-dev to provide libhdf5.so for compiling h5py.
 RUN apk add --no-cache \
     python3 \
     python3-dev \
     py3-pip \
     build-base \
     gfortran \
+    hdf5-dev \
     libjpeg-turbo-dev \
     libpng-dev \
     zlib-dev \
@@ -128,8 +129,8 @@ RUN pip3 install --no-cache-dir --extra-index-url https://developer.download.nvi
 # =========================================================================
 FROM builder_base as final
 
-# Install only the Python 3.8 runtime, no build tools
-RUN apk add --no-cache python3 openblas
+# Install only the Python 3.8 runtime and required runtime libraries
+RUN apk add --no-cache python3 openblas hdf5
 
 # Copy the extracted NVIDIA libraries from the downloader stage
 COPY --from=downloader /nvidia_libs/usr/local/cuda-11.4/lib64 /usr/local/nvidia/lib
