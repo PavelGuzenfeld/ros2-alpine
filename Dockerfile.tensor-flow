@@ -105,7 +105,6 @@ RUN apk add --no-cache \
 RUN python3 -m pip install --upgrade pip && \
     pip3 install --no-cache-dir \
     setuptools==65.5.0 \
-    testresources \
     numpy==1.21.1 \
     "Cython<3.0" \
     pkgconfig && \
@@ -113,6 +112,7 @@ RUN python3 -m pip install --upgrade pip && \
     h5py==3.7.0 \
     future \
     mock \
+    testresources \
     keras_preprocessing \
     keras_applications \
     gast==0.4.0 \
