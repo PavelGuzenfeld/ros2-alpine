@@ -3,8 +3,7 @@
 # Target: Jetson Xavier with JetPack 5.1 (L4T r35.2.1)
 # Base OS: Alpine 3.12 (to ensure Python 3.8 compatibility)
 #
-# This version adds python3-dev to the builder stage to allow pip to
-# compile C extensions for packages like numpy and h5py.
+# This version pins Cython to <3.0 to fix h5py compilation errors.
 
 # =========================================================================
 # Stage 1: glibc-Ready Alpine Base
@@ -102,11 +101,15 @@ RUN apk add --no-cache \
     openblas-dev
 
 # Install Python package dependencies required by NVIDIA's TensorFlow wheel
+# We install Cython<3.0 first to ensure compatibility with h5py compilation.
 RUN python3 -m pip install --upgrade pip && \
     pip3 install --no-cache-dir \
-    -U testresources setuptools==65.5.0 && \
-    pip3 install --no-cache-dir \
+    setuptools==65.5.0 \
+    testresources \
     numpy==1.21.1 \
+    "Cython<3.0" \
+    pkgconfig && \
+    pip3 install --no-cache-dir \
     h5py==3.7.0 \
     future \
     mock \
@@ -115,8 +118,6 @@ RUN python3 -m pip install --upgrade pip && \
     gast==0.4.0 \
     protobuf \
     pybind11 \
-    cython \
-    pkgconfig \
     packaging
 
 # Install the official NVIDIA TensorFlow wheel for JetPack 5.1 (L4T R35.2.1)
