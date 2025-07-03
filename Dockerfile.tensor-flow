@@ -1,114 +1,150 @@
-# Stage 1: Prepare a glibc-ready Alpine base
-# This stage installs a full glibc environment into Alpine, which is a prerequisite
-# for running the glibc-linked NVIDIA libraries and TensorFlow wheel.
-FROM alpine:3.16 as builder_base
+# Dockerfile to build a minimal Alpine-based TensorFlow image for NVIDIA Jetson
+#
+# Target: Jetson Xavier with JetPack 5.1 (L4T r35.2.1)
+# Base OS: Alpine 3.12 (to ensure Python 3.8 compatibility)
+#
+# This version adds python3-dev to the builder stage to allow pip to
+# compile C extensions for packages like numpy and h5py.
 
-# Install essential tools and the glibc package from the sgerrand repository
-ENV GLIBC_VERSION=2.35-r1
+# =========================================================================
+# Stage 1: glibc-Ready Alpine Base
+#
+# We use Alpine 3.12 to get Python 3.8, which is required by the official
+# NVIDIA TensorFlow wheel for JetPack 5.1.
+# =========================================================================
+FROM alpine:3.12 as builder_base
+
+# Install glibc compatibility layer. We only install the core glibc package
+# to avoid architecture-related trigger errors from glibc-bin on aarch64.
+ENV GLIBC_VERSION=2.33-r0
 RUN apk add --no-cache \
-        wget \
-        ca-certificates && \
+    wget \
+    ca-certificates && \
     wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub && \
     wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk && \
-    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-bin-${GLIBC_VERSION}.apk && \
-    apk add --no-cache \
-        glibc-${GLIBC_VERSION}.apk \
-        glibc-bin-${GLIBC_VERSION}.apk && \
+    apk add --no-cache --force-overwrite glibc-${GLIBC_VERSION}.apk && \
     rm glibc-*.apk
 
-# Stage 2: Download and extract minimal NVIDIA runtime libraries
-# This stage uses an Ubuntu container to download NVIDIA's.deb packages
-# and extract only the necessary.so files, avoiding a full toolkit installation.
+# Install a compatibility package that helps bridge glibc/musl differences.
+RUN apk add --no-cache libc6-compat
+
+# =========================================================================
+# Stage 2: Surgical Extraction of NVIDIA Runtime Libraries
+#
+# This stage downloads the required NVIDIA.deb packages for ARM64
+# and extracts only the essential shared libraries (.so files).
+# =========================================================================
 FROM ubuntu:20.04 as downloader
 
-# Add NVIDIA's CUDA repository
+# Set non-interactive frontend and install prerequisite packages first.
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        gnupg \
-        wget && \
-    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb && \
-    dpkg -i cuda-keyring_1.0-1_all.deb && \
-    apt-get update
+    ca-certificates \
+    wget \
+    gnupg
 
-# Create a directory to hold the extracted libraries
+# Add NVIDIA's official CUDA repository for ARM64 (aarch64)
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/arm64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i cuda-keyring_1.1-1_all.deb
+
+# Add the NVIDIA Jetson repository for L4T R35.2 (JetPack 5.1)
+RUN echo "deb https://repo.download.nvidia.com/jetson/common r35.2 main" > /etc/apt/sources.list.d/nvidia-jetson.list && \
+    echo "deb https://repo.download.nvidia.com/jetson/t234 r35.2 main" >> /etc/apt/sources.list.d/nvidia-jetson.list
+
+# Add the public key for the Jetson repository to resolve signature errors
+RUN wget -qO - https://repo.download.nvidia.com/jetson/jetson-ota-public.asc | apt-key add -
+
+# Update package lists to include all new repositories
+RUN apt-get update
+
+# Create a staging directory for the extracted libraries
 RUN mkdir -p /nvidia_libs
 
-# Download (don't install) the required runtime packages for CUDA 11.4, cuDNN 8, TensorRT 8
-# and extract their contents into the staging directory.
+# Download (but do not install) the required runtime packages.
 RUN apt-get download \
-        libcublas-11-4 \
-        libcudart-11-4 \
-        libcudnn8 \
-        libnvinfer8 \
-        libnvinfer-plugin8 \
-        libcusolver-11-4 \
-        libcusparse-11-4 \
-        libnvrtc-11-4 && \
+    cuda-runtime-11-4 \
+    libcublas-11-4 \
+    libcudnn8 \
+    libnvinfer8 \
+    libnvinfer-plugin8 \
+    libcusolver-11-4 \
+    libcusparse-11-4 \
+    cuda-nvrtc-11-4 && \
+    dpkg -x cuda-runtime-11-4*.deb /nvidia_libs && \
     dpkg -x libcublas-11-4*.deb /nvidia_libs && \
-    dpkg -x libcudart-11-4*.deb /nvidia_libs && \
     dpkg -x libcudnn8*.deb /nvidia_libs && \
     dpkg -x libnvinfer8*.deb /nvidia_libs && \
     dpkg -x libnvinfer-plugin8*.deb /nvidia_libs && \
     dpkg -x libcusolver-11-4*.deb /nvidia_libs && \
     dpkg -x libcusparse-11-4*.deb /nvidia_libs && \
-    dpkg -x libnvrtc-11-4*.deb /nvidia_libs
+    dpkg -x cuda-nvrtc-11-4*.deb /nvidia_libs
 
-# Stage 3: Build the Python environment and install TensorFlow
-# This stage uses the glibc-ready base to install Python and all dependencies,
-# including the special NVIDIA-provided TensorFlow wheel.
+# =========================================================================
+# Stage 3: Python Environment and TensorFlow Wheel Installation
+#
+# This stage builds upon the glibc-ready Alpine 3.12 base to create the
+# Python 3.8 environment and install TensorFlow.
+# =========================================================================
 FROM builder_base as builder_tf
 
-# Install Python and build dependencies
+# Install Python 3.8 (default in Alpine 3.12) and build dependencies
+# Added python3-dev to provide Python.h for compiling C extensions.
 RUN apk add --no-cache \
-        python3 \
-        py3-pip \
-        build-base \
-        gfortran \
-        libjpeg-turbo-dev \
-        libpng-dev \
-        zlib-dev
+    python3 \
+    python3-dev \
+    py3-pip \
+    build-base \
+    gfortran \
+    libjpeg-turbo-dev \
+    libpng-dev \
+    zlib-dev \
+    openblas-dev
 
-# Install Python package dependencies
+# Install Python package dependencies required by NVIDIA's TensorFlow wheel
 RUN python3 -m pip install --upgrade pip && \
     pip3 install --no-cache-dir \
-        numpy==1.21.1 \
-        h5py==3.7.0 \
-        setuptools==65.5.0 \
-        testresources \
-        future \
-        mock \
-        keras_preprocessing \
-        keras_applications \
-        gast==0.4.0 \
-        protobuf \
-        pybind11 \
-        cython \
-        pkgconfig \
-        packaging
+    -U testresources setuptools==65.5.0 && \
+    pip3 install --no-cache-dir \
+    numpy==1.21.1 \
+    h5py==3.7.0 \
+    future \
+    mock \
+    keras_preprocessing \
+    keras_applications \
+    gast==0.4.0 \
+    protobuf \
+    pybind11 \
+    cython \
+    pkgconfig \
+    packaging
 
 # Install the official NVIDIA TensorFlow wheel for JetPack 5.1 (L4T R35.2.1)
-# The --extra-index-url is mandatory.
 RUN pip3 install --no-cache-dir --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v51 tensorflow==2.11.0+nv23.1
 
-# Stage 4: Final assembly of the minimal production image
+# =========================================================================
+# Stage 4: Final Assembly and Optimization
+#
+# This final stage assembles the artifacts into the minimal production image.
+# =========================================================================
 FROM builder_base as final
 
-# Install only the Python runtime, no build tools
-RUN apk add --no-cache python3
+# Install only the Python 3.8 runtime, no build tools
+RUN apk add --no-cache python3 openblas
 
 # Copy the extracted NVIDIA libraries from the downloader stage
 COPY --from=downloader /nvidia_libs/usr/local/cuda-11.4/lib64 /usr/local/nvidia/lib
 COPY --from=downloader /nvidia_libs/usr/lib/aarch64-linux-gnu /usr/local/nvidia/lib
 
 # Copy the installed Python packages from the builder_tf stage
-COPY --from=builder_tf /usr/lib/python3.10/site-packages /usr/lib/python3.10/site-packages
+COPY --from=builder_tf /usr/lib/python3.8/site-packages /usr/lib/python3.8/site-packages
 
-# Set the library path so the system can find the NVIDIA libraries
+# Set the library path so the system can find the NVIDIA libraries at runtime
 ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib
 
 # Clean up apk cache
 RUN rm -rf /var/cache/apk/*
 
-# Set up a non-root user
+# Set up a non-root user for improved security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 WORKDIR /home/appuser
