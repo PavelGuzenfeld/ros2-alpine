@@ -3,7 +3,7 @@
 # Target: Jetson Xavier with JetPack 5.1 (L4T r35.2.1)
 # Base OS: Alpine 3.12 (to ensure Python 3.8 compatibility)
 #
-# This version adds the 'wheel' package to fix the 'bdist_wheel' error.
+# This version adds linux-headers to fix the grpcio compilation error.
 
 # =========================================================================
 # Stage 1: glibc-Ready Alpine Base
@@ -94,6 +94,7 @@ RUN apk add --no-cache \
     build-base \
     gfortran \
     hdf5-dev \
+    linux-headers \
     libjpeg-turbo-dev \
     libpng-dev \
     zlib-dev \
