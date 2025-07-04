@@ -3,7 +3,7 @@
 # Target: Jetson Xavier with JetPack 5.1 (L4T r35.2.1)
 # Base OS: Alpine 3.12 (to ensure Python 3.8 compatibility)
 #
-# This version uses --no-build-isolation to fix the h5py/Cython build error.
+# This version adds the 'wheel' package to fix the 'bdist_wheel' error.
 
 # =========================================================================
 # Stage 1: glibc-Ready Alpine Base
@@ -100,11 +100,11 @@ RUN apk add --no-cache \
     openblas-dev
 
 # Install Python package dependencies required by NVIDIA's TensorFlow wheel
-# We install Cython<3.0 first to ensure compatibility with h5py compilation.
-# We then use --no-build-isolation to force h5py to use the pre-installed Cython.
+# We install wheel, Cython<3.0, and other build tools first.
 RUN python3 -m pip install --upgrade pip && \
     pip3 install --no-cache-dir \
     setuptools==65.5.0 \
+    wheel \
     numpy==1.21.1 \
     "Cython<3.0" \
     pkgconfig && \
