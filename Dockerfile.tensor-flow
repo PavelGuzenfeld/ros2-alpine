@@ -3,7 +3,8 @@
 # Target: Jetson Xavier with JetPack 5.1 (L4T r35.2.1)
 # Base OS: Alpine 3.12 (to ensure Python 3.8 compatibility)
 #
-# This version adds linux-headers to fix the grpcio compilation error.
+# This version fixes the glibc runtime error by updating LD_LIBRARY_PATH
+# and adds a bash shell for usability.
 
 # =========================================================================
 # Stage 1: glibc-Ready Alpine Base
@@ -87,6 +88,7 @@ RUN apt-get download \
 FROM builder_base as builder_tf
 
 # Install Python 3.8 (default in Alpine 3.12) and build dependencies
+# Added linux-headers, which is required to compile grpcio.
 RUN apk add --no-cache \
     python3 \
     python3-dev \
@@ -131,8 +133,8 @@ RUN pip3 install --no-cache-dir --extra-index-url https://developer.download.nvi
 # =========================================================================
 FROM builder_base as final
 
-# Install only the Python 3.8 runtime and required runtime libraries
-RUN apk add --no-cache python3 openblas hdf5
+# Install only the Python 3.8 runtime, required runtime libraries, and bash
+RUN apk add --no-cache python3 openblas hdf5 bash
 
 # Copy the extracted NVIDIA libraries from the downloader stage
 COPY --from=downloader /nvidia_libs/usr/local/cuda-11.4/lib64 /usr/local/nvidia/lib
@@ -141,8 +143,8 @@ COPY --from=downloader /nvidia_libs/usr/lib/aarch64-linux-gnu /usr/local/nvidia/
 # Copy the installed Python packages from the builder_tf stage
 COPY --from=builder_tf /usr/lib/python3.8/site-packages /usr/lib/python3.8/site-packages
 
-# Set the library path so the system can find the NVIDIA libraries at runtime
-ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib
+# Set the library path to find both NVIDIA and glibc libraries at runtime
+ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/glibc-compat/lib
 
 # Clean up apk cache
 RUN rm -rf /var/cache/apk/*
@@ -153,4 +155,4 @@ USER appuser
 WORKDIR /home/appuser
 
 # Define the default command
-CMD ["python3"]
+CMD ["bash"]
