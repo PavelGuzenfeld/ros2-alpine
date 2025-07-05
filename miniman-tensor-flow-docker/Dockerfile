@@ -1,5 +1,7 @@
 # Dockerfile for a Minimal TensorFlow Image on Jetson (Ubuntu-based)
 # Target: Jetson Xavier with JetPack 5.1 (L4T r35.2.1)
+#
+# v3: Adds NVIDIA runtime libraries to the final image to enable GPU access.
 
 # =========================================================================
 # Stage 1: The Builder
@@ -38,7 +40,6 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies into the virtual environment
-# We install build tools like wheel and cython first
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir wheel && \
@@ -47,34 +48,51 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # =========================================================================
 # Stage 2: The Final Image
 #
-# This stage starts from a clean base and installs only the essential
-# runtime libraries, then copies the pre-built Python environment.
+# This stage starts from a clean base, installs the essential NVIDIA
+# runtime libraries, and then copies the pre-built Python environment.
 # =========================================================================
 FROM nvcr.io/nvidia/l4t-base:r35.2.1
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install runtime dependencies for NVIDIA libraries and Python packages
-# Note: We install the runtime packages, not the '-dev' versions
+# --- Configure APT for NVIDIA Repositories ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    gnupg && \
+    rm -rf /var/lib/apt/lists/*
+
+# Add the public GPG key for the Jetson repository
+RUN apt-key adv --fetch-keys https://repo.download.nvidia.com/jetson/jetson-ota-public.asc
+
+# Add the NVIDIA Jetson repository sources for L4T r35.2.1 (JetPack 5.1)
+RUN echo "deb https://repo.download.nvidia.com/jetson/common r35.2 main" > /etc/apt/sources.list.d/nvidia-jetson.list && \
+    echo "deb https://repo.download.nvidia.com/jetson/t234 r35.2 main" >> /etc/apt/sources.list.d/nvidia-jetson.list
+
+# --- Install Runtime Dependencies ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
-    libhdf5-serial-dev \
     libopenblas-base \
-    liblapack3 && \
+    liblapack3 \
+    cuda-runtime-11-4 \
+    libcudnn8 \
+    libnvinfer8 \
+    libnvinfer-plugin8 \
+    libnvonnxparsers8 \
+    libnvparsers8 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the pre-built Python virtual environment from the builder stage
 COPY --from=builder /opt/venv /opt/venv
 
 # Copy the application and test script
-COPY ./test_gpu.py /app/test_gpu.py
+COPY./test_gpu.py /app/test_gpu.py
 
 # Set the PATH to use the Python from our virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install the official NVIDIA TensorFlow wheel for JetPack 5.1
 # This ensures it links against the runtime libraries in this final image.
-# The version 2.11.0 is the correct one for JetPack 5.1 (L4T r35.2.1).
 RUN pip3 install --no-cache-dir --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v51 tensorflow==2.11.0+nv23.1
 
 # Set up a non-root user for security
