@@ -195,6 +195,7 @@ RUN echo "=== Building Core ROS ===" && \
             builtin_interfaces \
             std_msgs \
             rclpy \
+            ros2cli \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
