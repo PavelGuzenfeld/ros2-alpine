@@ -247,20 +247,17 @@ ENV ROS_VERSION=2 \
     ROS_PYTHON_VERSION=3 \
     RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
-RUN echo '#!/bin/bash' > /opt/ros/jazzy/setup.bash && \
-    echo 'export ROS_VERSION=2' >> /opt/ros/jazzy/setup.bash && \
-    echo 'export ROS_DISTRO=jazzy' >> /opt/ros/jazzy/setup.bash && \
-    echo 'export ROS_PYTHON_VERSION=3' >> /opt/ros/jazzy/setup.bash && \
-    echo 'export RMW_IMPLEMENTATION=rmw_fastrtps_cpp' >> /opt/ros/jazzy/setup.bash && \
-    echo 'for dir in /opt/ros/jazzy/*/; do' >> /opt/ros/jazzy/setup.bash && \
-    echo '  if [ -d "$dir/lib/python3.12/site-packages" ]; then' >> /opt/ros/jazzy/setup.bash && \
-    echo '    export PYTHONPATH="$dir/lib/python3.12/site-packages:$PYTHONPATH"' >> /opt/ros/jazzy/setup.bash && \
-    echo '  fi' >> /opt/ros/jazzy/setup.bash && \
-    echo '  if [ -d "$dir/bin" ]; then' >> /opt/ros/jazzy/setup.bash && \
-    echo '    export PATH="$dir/bin:$PATH"' >> /opt/ros/jazzy/setup.bash && \
-    echo '  fi' >> /opt/ros/jazzy/setup.bash && \
-    echo 'done' >> /opt/ros/jazzy/setup.bash && \
-    chmod +x /opt/ros/jazzy/setup.bash
+# The colcon install directory already contains proper setup scripts
+# Just make the main setup.bash executable and verify it exists  
+RUN if [ -f /opt/ros/jazzy/setup.bash ]; then \
+        chmod +x /opt/ros/jazzy/setup.bash; \
+        echo "✅ Using colcon-generated setup script"; \
+    else \
+        echo "⚠️ No colcon setup script found, creating basic one"; \
+        echo '#!/bin/bash' > /opt/ros/jazzy/setup.bash; \
+        echo '. /opt/ros/jazzy/local_setup.bash' >> /opt/ros/jazzy/setup.bash; \
+        chmod +x /opt/ros/jazzy/setup.bash; \
+    fi
 
 RUN mkdir -p /workspace/src
 WORKDIR /workspace
