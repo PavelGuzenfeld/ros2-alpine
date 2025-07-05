@@ -234,7 +234,10 @@ RUN apk add --no-cache \
     lttng-ust
 
 ENV PYTHONWARNINGS=ignore::UserWarning:setuptools._distutils.dist
-RUN pip3 install --break-system-packages --quiet lark wheel
+RUN pip3 install --break-system-packages --quiet \
+    lark \
+    wheel \
+    colcon-common-extensions
 
 RUN mkdir -p /opt/ros/jazzy
 COPY --from=builder /ros2_ws/install /opt/ros/jazzy
