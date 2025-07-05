@@ -95,9 +95,6 @@ ENV PATH="/opt/venv/bin:$PATH"
 # This ensures it links against the runtime libraries in this final image.
 RUN pip3 install --no-cache-dir --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v51 tensorflow==2.11.0+nv23.1
 
-# Set up a non-root user for security
-RUN adduser --disabled-password --gecos '' appuser
-USER appuser
 WORKDIR /app
 
 # Set the default command to run the verification script
