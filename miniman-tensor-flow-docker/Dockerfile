@@ -39,7 +39,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies into the virtual environment
 # We install build tools like wheel and cython first
-COPY requirements.txt.
+COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir wheel && \
     pip install --no-cache-dir -r requirements.txt
@@ -67,7 +67,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 
 # Copy the application and test script
-COPY./test_gpu.py /app/test_gpu.py
+COPY ./test_gpu.py /app/test_gpu.py
 
 # Set the PATH to use the Python from our virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
