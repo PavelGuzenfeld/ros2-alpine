@@ -86,7 +86,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 
 # Copy the application and test script
-COPY./test_gpu.py /app/test_gpu.py
+COPY ./test_gpu.py /app/test_gpu.py
 
 # Set the PATH to use the Python from our virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
