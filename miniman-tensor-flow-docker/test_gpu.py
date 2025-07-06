@@ -1,4 +1,6 @@
 import tensorflow as tf
+import cv2
+import numpy as np
 import sys
 import os
 
@@ -31,10 +33,22 @@ try:
     print("SUCCESS: GPU computation test passed.")
     print("Result of matrix multiplication on GPU:")
     print(c.numpy())
-    print("\n--- Verification Complete ---")
-
 except Exception as e:
     print(f"\nERROR: GPU computation test failed: {e}")
     sys.exit(1)
 
+print("\n--- OpenCV Verification ---")
+try:
+    print(f"OpenCV Version: {cv2.__version__}")
+    img = np.zeros((100, 100, 3), dtype=np.uint8)
+    cv2.rectangle(img, (10, 10), (90, 90), (255, 0, 0), -1)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    if gray.shape != (100, 100):
+        raise ValueError("Incorrect grayscale shape.")
+    print("SUCCESS: OpenCV basic operations passed.")
+except Exception as e:
+    print(f"ERROR: OpenCV verification failed: {e}")
+    sys.exit(1)
+
+print("\n--- All Verifications Passed ---")
 sys.exit(0)
