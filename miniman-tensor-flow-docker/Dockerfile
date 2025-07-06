@@ -28,7 +28,6 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip wheel && \
     pip install --no-cache-dir -r requirements.txt
 
-
 # build OpenCV inside venv
 RUN mkdir -p /tmp/opencv && cd /tmp/opencv && \
     git clone --depth 1 --branch 4.x https://github.com/opencv/opencv.git . && \
@@ -59,6 +58,7 @@ FROM nvcr.io/nvidia/l4t-base:r35.2.1
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH="/opt/venv/bin:$PATH"
+ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
 
 # setup nvidia runtime deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -85,6 +85,13 @@ RUN apt-key adv --fetch-keys https://repo.download.nvidia.com/jetson/jetson-ota-
 
 # copy prebuilt python venv with OpenCV + deps
 COPY --from=builder /opt/venv /opt/venv
+
+# copy OpenCV shared libraries from builder stage
+COPY --from=builder /usr/local/lib/libopencv* /usr/local/lib/
+
+# update library cache
+RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && \
+    ldconfig
 
 # copy app
 COPY ./test_gpu.py /app/test_gpu.py
