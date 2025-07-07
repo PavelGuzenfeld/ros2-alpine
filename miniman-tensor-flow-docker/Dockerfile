@@ -1,5 +1,5 @@
 # Jetson Xavier TensorFlow + OpenCV + ROS2 Jazzy (Base Level Only - Fast-DDS)
-# FINAL CORRECTED BUILD V4 - SHELL FIX
+# FINAL CORRECTED BUILD V5 - REFINED STAGED BUILD
 FROM nvcr.io/nvidia/l4t-base:r35.2.1 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -344,7 +344,7 @@ RUN rosdep init || echo "rosdep already initialized" && \
     rosdep update && \
     rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || echo "Some dependencies may not be available; this is expected."
 
-# *** FIX: Set the default shell to bash for all subsequent RUN commands ***
+# Set the default shell to bash for all subsequent RUN commands
 SHELL ["/bin/bash", "-c"]
 
 # Staged build process to isolate failures
@@ -362,20 +362,19 @@ RUN echo "=== Stage 2: Building middleware ===" && \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ || (echo "MIDDLEWARE BUILD FAILED" && exit 1)
 
-# Stage 3: Build ROSIDL (the message generation core)
+# Stage 3: Build the ENTIRE ROSIDL system first. This is the critical fix.
 RUN echo "=== Stage 3: Building ROSIDL packages ===" && \
     source install/setup.bash && \
-    colcon build --symlink-install --packages-up-to rosidl_generator_py \
+    colcon build --symlink-install --packages-up-to rosidl_generator_py rosidl_dynamic_typesupport \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ || (echo "ROSIDL BUILD FAILED" && exit 1)
 
-# Stage 4: Build the rest of the core packages, including cv_bridge
+# Stage 4: Build the rest of the core packages, now that ROSIDL is available.
 RUN echo "=== Stage 4: Building remaining core packages ===" && \
     source install/setup.bash && \
     colcon build --symlink-install --packages-up-to rclpy ros2cli cv_bridge \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ || (echo "CORE PACKAGE BUILD FAILED" && exit 1)
-
 
 # Set up ROS2 environment
 ENV ROS_DISTRO=jazzy
@@ -387,6 +386,9 @@ ENV PYTHONPATH=/opt/ros2_jazzy/install/local/lib/python3.8/site-packages:/opt/ro
 ENV ROS_PYTHON_VERSION=3
 ENV ROS_VERSION=2
 ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+
+# Revert to default shell
+SHELL ["/bin/sh", "-c"]
 ENV DEBIAN_FRONTEND=
 
 # add Jetson repo keys
