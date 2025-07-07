@@ -291,8 +291,8 @@ RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && \
     ldconfig
 
 # copy app with enhanced tests
-COPY ./test_gpu.py /app/test_gpu.py
-WORKDIR /app
+COPY ./build_test.py /test/build_test.py
+WORKDIR /test
 
 # install nvidia tensorflow in final image
 RUN pip install --no-cache-dir --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v51 tensorflow==2.11.0+nv23.1 && \
