@@ -1,4 +1,5 @@
 # Jetson Xavier TensorFlow + OpenCV + ROS2 Jazzy (Base Level Only - Fast-DDS)
+# FINAL CORRECTED BUILD V4 - SHELL FIX
 FROM nvcr.io/nvidia/l4t-base:r35.2.1 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -343,6 +344,9 @@ RUN rosdep init || echo "rosdep already initialized" && \
     rosdep update && \
     rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || echo "Some dependencies may not be available; this is expected."
 
+# *** FIX: Set the default shell to bash for all subsequent RUN commands ***
+SHELL ["/bin/bash", "-c"]
+
 # Staged build process to isolate failures
 # Each step sources the previous installation to ensure dependencies are found.
 # Stage 1: Build foundational 'ament' packages
@@ -353,21 +357,21 @@ RUN echo "=== Stage 1: Building ament packages ===" && \
 
 # Stage 2: Build middleware and its dependencies
 RUN echo "=== Stage 2: Building middleware ===" && \
-    . install/setup.bash && \
+    source install/setup.bash && \
     colcon build --symlink-install --packages-up-to foonathan_memory_vendor fastcdr libyaml_vendor spdlog_vendor pybind11_vendor \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ || (echo "MIDDLEWARE BUILD FAILED" && exit 1)
 
 # Stage 3: Build ROSIDL (the message generation core)
 RUN echo "=== Stage 3: Building ROSIDL packages ===" && \
-    . install/setup.bash && \
+    source install/setup.bash && \
     colcon build --symlink-install --packages-up-to rosidl_generator_py \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ || (echo "ROSIDL BUILD FAILED" && exit 1)
 
-# Stage 4: Build the rest of the core packages, including the one that failed (builtin_interfaces)
+# Stage 4: Build the rest of the core packages, including cv_bridge
 RUN echo "=== Stage 4: Building remaining core packages ===" && \
-    . install/setup.bash && \
+    source install/setup.bash && \
     colcon build --symlink-install --packages-up-to rclpy ros2cli cv_bridge \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ || (echo "CORE PACKAGE BUILD FAILED" && exit 1)
