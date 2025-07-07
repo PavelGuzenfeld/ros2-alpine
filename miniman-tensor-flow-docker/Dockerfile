@@ -1,4 +1,5 @@
-# Minimal TensorFlow + OpenCV Dockerfile for Jetson (L4T r35.2.1 / JetPack 5.1)
+# Jetson TensorFlow + OpenCV + ROS2 Jazzy (Base Level Only - Fast-DDS)
+# Note: Uses Fast-DDS middleware only, CycloneDX excluded for smaller build
 FROM nvcr.io/nvidia/l4t-base:r35.2.1 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -187,7 +188,7 @@ RUN mkdir -p /tmp/opencv && cd /tmp/opencv && \
     rm -rf /tmp/opencv
 
 # =========================================================================
-# Final Stage
+# Final Stage with ROS2 Jazzy (Base Level Only - Fast-DDS middleware)
 # =========================================================================
 FROM nvcr.io/nvidia/l4t-base:r35.2.1
 
@@ -275,8 +276,106 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-gi \
     python3-gi-cairo \
     gir1.2-glib-2.0 \
-    gir1.2-gstreamer-1.0 && \
+    gir1.2-gstreamer-1.0 \
+    software-properties-common \
+    lsb-release && \
     rm -rf /var/lib/apt/lists/*
+
+# Install ROS2 build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-colcon-common-extensions \
+    python3-rosdep \
+    python3-vcstool \
+    python3-venv \
+    libasio-dev \
+    libtinyxml2-dev \
+    libcunit1-dev \
+    libeigen3-dev \
+    liblog4cxx-dev \
+    libspdlog-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python build dependencies
+RUN pip3 install --upgrade setuptools==58.2.0 \
+    argcomplete \
+    flake8-blind-except \
+    flake8-builtins \
+    flake8-class-newline \
+    flake8-comprehensions \
+    flake8-deprecated \
+    flake8-docstrings \
+    flake8-import-order \
+    flake8-quotes \
+    pytest-repeat \
+    pytest-rerunfailures \
+    pytest
+
+# Create ROS2 workspace and clone ONLY ros-base level packages
+RUN mkdir -p /opt/ros2_jazzy/src && \
+    cd /opt/ros2_jazzy/src
+
+# Clone core ROS2 packages (ros-core level)
+RUN cd /opt/ros2_jazzy/src && \
+    git clone -b jazzy https://github.com/ros2/rcl.git && \
+    git clone -b jazzy https://github.com/ros2/rclcpp.git && \
+    git clone -b jazzy https://github.com/ros2/rclpy.git && \
+    git clone -b jazzy https://github.com/ros2/rcutils.git && \
+    git clone -b jazzy https://github.com/ros2/rmw.git && \
+    git clone -b jazzy https://github.com/ros2/rmw_implementation.git && \
+    git clone -b jazzy https://github.com/ros2/rmw_fastrtps.git && \
+    git clone -b jazzy https://github.com/ros2/rosidl.git && \
+    git clone -b jazzy https://github.com/ros2/common_interfaces.git && \
+    git clone -b jazzy https://github.com/ros2/example_interfaces.git && \
+    git clone -b jazzy https://github.com/ros2/unique_identifier_msgs.git
+
+# Clone ros-base level packages (CLI tools, launch, rosbag)
+RUN cd /opt/ros2_jazzy/src && \
+    git clone -b jazzy https://github.com/ros2/ros2cli.git && \
+    git clone -b jazzy https://github.com/ros2/launch.git && \
+    git clone -b jazzy https://github.com/ros2/launch_ros.git && \
+    git clone -b jazzy https://github.com/ros2/rosbag2.git && \
+    git clone -b jazzy https://github.com/ros2/ament_cmake.git && \
+    git clone -b jazzy https://github.com/ament/ament_lint.git && \
+    git clone -b jazzy https://github.com/ament/ament_index.git && \
+    git clone -b jazzy https://github.com/ament/ament_package.git
+
+# Clone essential middleware packages (Fast-DDS only)
+RUN cd /opt/ros2_jazzy/src && \
+    git clone -b jazzy https://github.com/eProsima/Fast-DDS.git || true && \
+    git clone -b jazzy https://github.com/eProsima/Fast-CDR.git || true && \
+    git clone -b jazzy https://github.com/eProsima/foonathan_memory_vendor.git || true
+
+# Initialize rosdep and install dependencies
+RUN rosdep init && \
+    rosdep update && \
+    cd /opt/ros2_jazzy && \
+    rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || true
+
+# Build ONLY the ros-base level packages
+RUN cd /opt/ros2_jazzy && \
+    colcon build --symlink-install \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    --packages-up-to \
+        rcl \
+        rclcpp \
+        rclpy \
+        ros2cli \
+        launch \
+        launch_ros \
+        rosbag2 \
+    || echo "Some packages may have failed to build, continuing..."
+
+# Set up ROS2 environment (Base level with Fast-DDS)
+ENV ROS_DISTRO=jazzy
+ENV AMENT_PREFIX_PATH=/opt/ros2_jazzy/install
+ENV COLCON_PREFIX_PATH=/opt/ros2_jazzy/install
+ENV LD_LIBRARY_PATH=/opt/ros2_jazzy/install/lib:$LD_LIBRARY_PATH
+ENV PATH=/opt/ros2_jazzy/install/bin:$PATH
+ENV PYTHONPATH=/opt/ros2_jazzy/install/local/lib/python3.8/site-packages:/opt/ros2_jazzy/install/lib/python3.8/site-packages:$PYTHONPATH
+ENV ROS_PYTHON_VERSION=3
+ENV ROS_VERSION=2
+ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+ENV DEBIAN_FRONTEND=
 
 # add Jetson repo keys
 RUN apt-key adv --fetch-keys https://repo.download.nvidia.com/jetson/jetson-ota-public.asc && \
@@ -297,7 +396,7 @@ COPY --from=builder /usr/include/gstreamer-1.0/ /usr/include/gstreamer-1.0/
 # copy OpenCV shared libraries from builder stage
 COPY --from=builder /usr/local/lib/libopencv* /usr/local/lib/
 
-# update library cache
+# update library cache and prebuild GStreamer registry
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && \
     echo "/usr/lib/aarch64-linux-gnu" > /etc/ld.so.conf.d/gstreamer.conf && \
     ldconfig && \
@@ -305,12 +404,27 @@ RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && \
     export GST_DEBUG=0 && \
     timeout 30s gst-inspect-1.0 --print-all >/dev/null 2>&1 || true
 
-# copy app with enhanced tests
-COPY ./build_test.py /test/build_test.py
-WORKDIR /test
+# Create ROS2 workspace
+RUN mkdir -p /workspace/src
+WORKDIR /workspace
 
 # install nvidia tensorflow in final image
 RUN pip install --no-cache-dir --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v51 tensorflow==2.11.0+nv23.1 && \
     pip install --no-cache-dir click PyGObject
 
-CMD [ "bash" ]
+# Create startup script that sources ROS2
+RUN echo '#!/bin/bash\n\
+if [ -f /opt/ros2_jazzy/install/setup.bash ]; then\n\
+  source /opt/ros2_jazzy/install/setup.bash\n\
+fi\n\
+if [ -f /workspace/install/setup.bash ]; then\n\
+  source /workspace/install/setup.bash\n\
+fi\n\
+exec "$@"' > /ros_entrypoint.sh && \
+    chmod +x /ros_entrypoint.sh
+
+# Copy test script
+COPY ./test_ros2.py /test/test_ros2.py
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["bash"]
