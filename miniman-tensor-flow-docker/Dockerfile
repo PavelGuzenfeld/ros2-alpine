@@ -212,6 +212,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     python3 \
+    python3-pip \
+    python3-dev \
     libopenblas-base \
     liblapack3 \
     cuda-runtime-11-4 \
@@ -220,7 +222,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libnvinfer-plugin8 \
     libnvonnxparsers8 \
     libnvparsers8 \
-    python3-dev \
     libhdf5-dev \
     libudev1 \
     libasound2 \
@@ -281,22 +282,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lsb-release && \
     rm -rf /var/lib/apt/lists/*
 
-# Install ROS2 build dependencies
+# Install minimal system build dependencies (Ubuntu 20.04 compatible)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-colcon-common-extensions \
-    python3-rosdep \
-    python3-vcstool \
-    python3-venv \
-    libasio-dev \
     libtinyxml2-dev \
-    libcunit1-dev \
-    libeigen3-dev \
-    liblog4cxx-dev \
-    libspdlog-dev \
+    libssl-dev \
+    libyaml-cpp-dev \
+    libacl1-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python build dependencies
 RUN pip3 install --upgrade setuptools==58.2.0 \
+    colcon-common-extensions \
+    vcstool \
+    rosdep \
     argcomplete \
     flake8-blind-except \
     flake8-builtins \
@@ -346,10 +344,10 @@ RUN cd /opt/ros2_jazzy/src && \
     git clone -b jazzy https://github.com/eProsima/foonathan_memory_vendor.git || true
 
 # Initialize rosdep and install dependencies
-RUN rosdep init && \
+RUN rosdep init || echo "rosdep already initialized" && \
     rosdep update && \
     cd /opt/ros2_jazzy && \
-    rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || true
+    rosdep install --from-paths src --ignore-src --rosdistro humble -y || echo "Some dependencies may not be available"
 
 # Build ONLY the ros-base level packages
 RUN cd /opt/ros2_jazzy && \
