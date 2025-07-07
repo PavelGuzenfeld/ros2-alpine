@@ -211,8 +211,10 @@ except Exception as e:
 
 print("\n--- System Information ---")
 try:
-    print(f"CUDA Runtime Version: {tf.sysconfig.get_build_info()['cuda_version']}")
-    print(f"cuDNN Version: {tf.sysconfig.get_build_info()['cudnn_version']}")
+    cuda_version = tf.sysconfig.get_build_info().get('cuda_version', 'N/A')
+    cudnn_version = tf.sysconfig.get_build_info().get('cudnn_version', 'N/A')
+    print(f"CUDA Runtime Version: {cuda_version}")
+    print(f"cuDNN Version: {cudnn_version}")
 except:
     print("Could not retrieve CUDA/cuDNN version info.")
 
@@ -223,7 +225,7 @@ print("✅ GStreamer Integration: Detected")
 print(f"✅ ROS2: {ros_distro} Environment Ready")
 print("\nContainer is ready for Jetson AI + ROS2 workloads!")
 print("\n📝 Quick Start:")
-print("  - Run: source /opt/ros/humble/setup.bash")  
+print(f"  - Source environment: source /opt/ros2_jazzy/install/setup.bash")  
 print("  - Create workspace: mkdir -p ~/ros2_ws/src && cd ~/ros2_ws")
 print("  - Build: colcon build")
-print("  - Source: source install/setup.bash")
+print("  - Source local workspace: source install/setup.bash")
