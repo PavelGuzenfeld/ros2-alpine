@@ -144,7 +144,7 @@ RUN meson setup --wipe builddir \
     meson install -C builddir
 
 # Install Python dependencies for GStreamer
-RUN pip3 install click
+RUN pip3 install click PyGObject
 
 # Clean up build directory
 RUN cd / && rm -rf /tmp/gst-1.24
@@ -263,7 +263,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libv4l-0 \
     v4l-utils \
     python3-gi \
-    python3-gi-cairo && \
+    python3-gi-cairo \
+    gir1.2-glib-2.0 \
+    gir1.2-gstreamer-1.0 && \
     rm -rf /var/lib/apt/lists/*
 
 # add Jetson repo keys
@@ -296,6 +298,6 @@ WORKDIR /test
 
 # install nvidia tensorflow in final image
 RUN pip install --no-cache-dir --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v51 tensorflow==2.11.0+nv23.1 && \
-    pip install --no-cache-dir click
+    pip install --no-cache-dir click PyGObject
 
-CMD [ "bash"]
+CMD [ "bash" ]
