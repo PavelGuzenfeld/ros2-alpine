@@ -146,6 +146,12 @@ RUN meson setup --wipe builddir \
 # Install Python dependencies for GStreamer
 RUN pip3 install click PyGObject
 
+# Install additional GI dependencies in builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gir1.2-glib-2.0 \
+    gir1.2-gstreamer-1.0 && \
+    rm -rf /var/lib/apt/lists/*
+
 # Clean up build directory
 RUN cd / && rm -rf /tmp/gst-1.24
 
@@ -194,6 +200,10 @@ ENV PYTHON=/usr/bin/python3
 ENV GI_TYPELIB_PATH=/usr/lib/aarch64-linux-gnu/girepository-1.0
 ENV PYTHONPATH="/usr/lib/python3/site-packages"
 ENV LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libgomp.so.1:/usr/lib/aarch64-linux-gnu/libGLdispatch.so"
+ENV GST_REGISTRY_UPDATE=no
+ENV GST_PLUGIN_SCANNER_TIMEOUT=5
+ENV GST_PLUGIN_SYSTEM_PATH=""
+ENV GST_DEBUG=0
 
 # setup nvidia runtime deps and supporting libraries for GStreamer
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -290,7 +300,10 @@ COPY --from=builder /usr/local/lib/libopencv* /usr/local/lib/
 # update library cache
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && \
     echo "/usr/lib/aarch64-linux-gnu" > /etc/ld.so.conf.d/gstreamer.conf && \
-    ldconfig
+    ldconfig && \
+    export GST_REGISTRY_UPDATE=no && \
+    export GST_DEBUG=0 && \
+    timeout 30s gst-inspect-1.0 --print-all >/dev/null 2>&1 || true
 
 # copy app with enhanced tests
 COPY ./build_test.py /test/build_test.py
