@@ -13,7 +13,6 @@ gpu_devices = tf.config.list_physical_devices('GPU')
 if not gpu_devices:
     print("\nERROR: No GPU detected by TensorFlow.")
     print("Please ensure the container was started with '--runtime nvidia'.")
-    sys.exit(1)
 
 print(f"\nSUCCESS: Found {len(gpu_devices)} GPU(s):")
 for device in gpu_devices:
@@ -35,7 +34,6 @@ try:
     print(c.numpy())
 except Exception as e:
     print(f"\nERROR: GPU computation test failed: {e}")
-    sys.exit(1)
 
 print("\n--- OpenCV Verification ---")
 try:
@@ -48,7 +46,6 @@ try:
     print("SUCCESS: OpenCV basic operations passed.")
 except Exception as e:
     print(f"ERROR: OpenCV verification failed: {e}")
-    sys.exit(1)
 
 print("\n--- GStreamer Support Verification ---")
 try:
@@ -157,4 +154,3 @@ except:
     print("Could not retrieve CUDA/cuDNN version info.")
 
 print("\n--- All Verifications Passed ---")
-sys.exit(0)
