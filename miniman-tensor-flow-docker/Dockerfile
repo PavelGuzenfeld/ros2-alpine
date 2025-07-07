@@ -393,6 +393,13 @@ RUN cd src && \
     (git clone -b jazzy https://github.com/ros2/rosidl_typesupport_fastrtps.git || echo "rosidl_typesupport_fastrtps clone failed, continuing...") && \
     echo "Middleware packages cloned"
 
+# *** NEW: Clone vision_opencv for cv_bridge support ***
+RUN cd src && \
+    echo "Cloning vision_opencv for cv_bridge..." && \
+    (git clone -b jazzy https://github.com/ros-perception/vision_opencv.git || echo "vision_opencv clone failed, continuing...") && \
+    echo "vision_opencv cloned"
+
+
 # Clean test directories like Alpine
 RUN cd src && \
     find . -name "*_test" -type d ! -path "./ament_cmake/ament_cmake_test*" ! -path "./ament_cmake/ament_cmake_gmock*" ! -path "./ament_cmake_ros/rmw_test_fixture*" -exec rm -rf {} + 2>/dev/null || true && \
@@ -408,26 +415,12 @@ RUN rosdep init || echo "rosdep already initialized" && \
     rosdep update && \
     rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || echo "Some dependencies may not be available"
 
-# Build Stage 1: Foundation packages (following Alpine pattern exactly)
-RUN echo "=== Building Foundation Packages ===" && \
-    colcon build \
-        --packages-select \
-            ament_package \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --event-handlers console_direct+ || echo "Foundation packages failed, continuing..."
 
-# Build Stage 2: Ament build system (following Alpine pattern)
-RUN echo "=== Building Ament Build System ===" && \
-    bash -c 'source install/setup.bash && \
+# *** FINAL FIX: Perform a single, complete colcon build ***
+# This is more robust than staged builds and ensures all linked dependencies are met.
+RUN echo "=== Building ALL ROS2 Packages ===" && \
     colcon build \
-        --packages-up-to \
-            ament_cmake \
-            ament_lint_common \
-            ament_index_python \
+        --symlink-install \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
@@ -435,77 +428,8 @@ RUN echo "=== Building Ament Build System ===" && \
             -DPython3_EXECUTABLE=/usr/bin/python3 \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --event-handlers console_direct+' || echo "Ament build system failed, continuing..."
+        --event-handlers console_direct+ || echo "Colcon build finished with some errors."
 
-# Build Stage 3: External dependencies (following Alpine pattern)
-RUN echo "=== Building External Dependencies ===" && \
-    bash -c 'source install/setup.bash && \
-    colcon build \
-        --packages-up-to \
-            foonathan_memory_vendor \
-            fastcdr \
-            libyaml_vendor \
-            spdlog_vendor \
-            pybind11_vendor \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --event-handlers console_direct+' || echo "External dependencies failed, continuing..."
-
-# Build Stage 4: rpyutils (following Alpine pattern)
-RUN echo "=== Building rpyutils (Python utilities) ===" && \
-    bash -c 'source install/setup.bash && \
-    colcon build \
-        --packages-select \
-            rpyutils \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
-            -DPython3_EXECUTABLE=/usr/bin/python3 \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --event-handlers console_direct+' || echo "rpyutils failed, continuing..."
-
-# Build Stage 5: ROSIDL Core (following Alpine pattern)
-RUN echo "=== Building ROSIDL Core ===" && \
-    bash -c 'source install/setup.bash && \
-    colcon build \
-        --packages-up-to \
-            rosidl_generator_py \
-            rosidl_adapter \
-            rosidl_cmake \
-            rosidl_parser \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
-            -DPython3_EXECUTABLE=/usr/bin/python3 \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --event-handlers console_direct+' || echo "ROSIDL core failed, continuing..."
-
-# Build Stage 6: Core ROS packages (following Alpine pattern)
-RUN echo "=== Building Core ROS ===" && \
-    bash -c 'source install/setup.bash && \
-    colcon build \
-        --packages-up-to \
-            rcutils \
-            rmw \
-            builtin_interfaces \
-            std_msgs \
-            rclpy \
-            ros2cli \
-        --cmake-args \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF \
-            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
-            -DPython3_EXECUTABLE=/usr/bin/python3 \
-            -DCMAKE_C_FLAGS="${CFLAGS}" \
-            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
-        --event-handlers console_direct+' || echo "Core ROS failed, continuing..."
 
 # Set up ROS2 environment (Base level with Fast-DDS)
 ENV ROS_DISTRO=jazzy
@@ -556,6 +480,7 @@ RUN pip install --no-cache-dir --extra-index-url https://developer.download.nvid
 
 # Create startup script that sources ROS2
 RUN echo '#!/bin/bash\n\
+set -e\n\
 if [ -f /opt/ros2_jazzy/install/setup.bash ]; then\n\
   source /opt/ros2_jazzy/install/setup.bash\n\
 fi\n\
