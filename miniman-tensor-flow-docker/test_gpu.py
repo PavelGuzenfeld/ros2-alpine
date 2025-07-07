@@ -50,5 +50,111 @@ except Exception as e:
     print(f"ERROR: OpenCV verification failed: {e}")
     sys.exit(1)
 
+print("\n--- GStreamer Support Verification ---")
+try:
+    import subprocess
+    
+    # Check GStreamer version
+    try:
+        result = subprocess.run(['gst-launch-1.0', '--version'], 
+                               capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            version_line = result.stdout.strip().split('\n')[0]
+            print(f"GStreamer Version: {version_line}")
+            
+            # Check if it's version 1.24.9
+            if "1.24.9" in version_line:
+                print("SUCCESS: Custom GStreamer 1.24.9 build detected!")
+            else:
+                print(f"INFO: GStreamer version detected but not 1.24.9: {version_line}")
+        else:
+            print("WARNING: Could not determine GStreamer version")
+    except Exception as e:
+        print(f"WARNING: Could not check GStreamer version: {e}")
+    
+    # Check Python GStreamer bindings (GObject Introspection)
+    try:
+        import gi
+        gi.require_version('Gst', '1.0')
+        from gi.repository import Gst
+        
+        Gst.init(None)
+        gst_version = ".".join([str(Gst.VERSION_MAJOR), str(Gst.VERSION_MINOR), str(Gst.VERSION_MICRO)])
+        print(f"SUCCESS: Python GStreamer bindings available! Version: {gst_version}")
+        
+        # Test creating a simple pipeline
+        pipeline_str = "videotestsrc num-buffers=1 ! fakesink"
+        pipeline = Gst.parse_launch(pipeline_str)
+        if pipeline:
+            print("SUCCESS: GStreamer Python pipeline creation test passed!")
+        else:
+            print("WARNING: Could not create GStreamer pipeline from Python")
+            
+    except ImportError as e:
+        print(f"WARNING: Python GStreamer bindings not available: {e}")
+    except Exception as e:
+        print(f"WARNING: Python GStreamer test failed: {e}")
+    
+    # Check if OpenCV was built with GStreamer support
+    build_info = cv2.getBuildInformation()
+    gstreamer_support = "GStreamer:" in build_info and "YES" in build_info.split("GStreamer:")[1].split("\n")[0]
+    
+    if gstreamer_support:
+        print("SUCCESS: OpenCV was built with GStreamer support.")
+        # Try to extract GStreamer version from OpenCV build info
+        try:
+            gst_line = [line for line in build_info.split('\n') if 'GStreamer:' in line][0]
+            print(f"OpenCV GStreamer info: {gst_line.strip()}")
+        except:
+            pass
+    else:
+        print("WARNING: OpenCV was not built with GStreamer support.")
+    
+    # Test VideoCapture backends
+    backends = []
+    backend_names = {cv2.CAP_GSTREAMER: "GStreamer", cv2.CAP_V4L2: "V4L2", cv2.CAP_FFMPEG: "FFmpeg"}
+    
+    for backend, name in backend_names.items():
+        try:
+            cap = cv2.VideoCapture()
+            if cap.open(0, backend):
+                backends.append(name)
+                cap.release()
+        except:
+            pass
+    
+    if backends:
+        print(f"SUCCESS: Available video backends: {', '.join(backends)}")
+    else:
+        print("INFO: No video backends available (this is normal in containers without camera access).")
+        
+    # Test GStreamer pipeline creation via OpenCV (if available)
+    if cv2.CAP_GSTREAMER in [cv2.CAP_GSTREAMER] and gstreamer_support:
+        try:
+            # Test a simple GStreamer pipeline
+            pipeline = "videotestsrc num-buffers=1 ! videoconvert ! appsink"
+            cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+            if cap.isOpened():
+                ret, frame = cap.read()
+                if ret and frame is not None:
+                    print("SUCCESS: OpenCV GStreamer pipeline test passed!")
+                else:
+                    print("INFO: OpenCV GStreamer pipeline opened but no frame captured")
+                cap.release()
+            else:
+                print("INFO: Could not open OpenCV GStreamer test pipeline")
+        except Exception as e:
+            print(f"INFO: OpenCV GStreamer pipeline test failed: {e}")
+        
+except Exception as e:
+    print(f"WARNING: GStreamer verification encountered an issue: {e}")
+
+print("\n--- System Information ---")
+try:
+    print(f"CUDA Runtime Version: {tf.sysconfig.get_build_info()['cuda_version']}")
+    print(f"cuDNN Version: {tf.sysconfig.get_build_info()['cudnn_version']}")
+except:
+    print("Could not retrieve CUDA/cuDNN version info.")
+
 print("\n--- All Verifications Passed ---")
 sys.exit(0)

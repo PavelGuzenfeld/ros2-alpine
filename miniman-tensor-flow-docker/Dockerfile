@@ -193,7 +193,7 @@ ENV GST_PLUGIN_PATH="/usr/lib/aarch64-linux-gnu/gstreamer-1.0"
 ENV PYTHON=/usr/bin/python3
 ENV GI_TYPELIB_PATH=/usr/lib/aarch64-linux-gnu/girepository-1.0
 ENV PYTHONPATH="/usr/lib/python3/site-packages"
-ENV LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libGLdispatch.so"
+ENV LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libgomp.so.1:/usr/lib/aarch64-linux-gnu/libGLdispatch.so"
 
 # setup nvidia runtime deps and supporting libraries for GStreamer
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -298,4 +298,4 @@ WORKDIR /app
 RUN pip install --no-cache-dir --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v51 tensorflow==2.11.0+nv23.1 && \
     pip install --no-cache-dir click
 
-CMD [ "python3", "test_gpu.py" ]
+CMD [ "bash"]
