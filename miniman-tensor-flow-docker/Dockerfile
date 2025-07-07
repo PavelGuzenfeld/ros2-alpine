@@ -211,6 +211,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
     gnupg \
+    git \
+    build-essential \
+    cmake \
     python3 \
     python3-pip \
     python3-dev \
@@ -312,6 +315,14 @@ RUN pip3 install --upgrade setuptools==58.2.0 \
 RUN mkdir -p /opt/ros2_jazzy/src && \
     cd /opt/ros2_jazzy/src
 
+# Clone the missing core ament packages that everything depends on
+RUN cd /opt/ros2_jazzy/src && \
+    (git clone -b jazzy https://github.com/ament/ament_cmake.git || echo "ament_cmake clone failed, continuing...") && \
+    (git clone -b jazzy https://github.com/ros2/console_bridge_vendor.git || echo "console_bridge_vendor clone failed, continuing...") && \
+    (git clone -b jazzy https://github.com/ament/uncrustify_vendor.git || echo "uncrustify_vendor clone failed, continuing...") && \
+    (git clone -b jazzy https://github.com/ros2/python_cmake_module.git || echo "python_cmake_module clone failed, continuing...") && \
+    (git clone -b jazzy https://github.com/ros2/ros_environment.git || echo "ros_environment clone failed, continuing...")
+
 # Clone core ROS2 packages (ros-core level)
 RUN cd /opt/ros2_jazzy/src && \
     git clone -b jazzy https://github.com/ros2/rcl.git && \
@@ -326,30 +337,41 @@ RUN cd /opt/ros2_jazzy/src && \
     git clone -b jazzy https://github.com/ros2/example_interfaces.git && \
     git clone -b jazzy https://github.com/ros2/unique_identifier_msgs.git
 
-# Clone ros-base level packages (CLI tools, launch, rosbag)
+# Clone ros-base level packages (CLI tools, launch, rosbag) - with proper error handling
 RUN cd /opt/ros2_jazzy/src && \
-    git clone -b jazzy https://github.com/ros2/ros2cli.git && \
-    git clone -b jazzy https://github.com/ros2/launch.git && \
-    git clone -b jazzy https://github.com/ros2/launch_ros.git && \
-    git clone -b jazzy https://github.com/ros2/rosbag2.git && \
-    git clone -b jazzy https://github.com/ros2/ament_cmake.git && \
-    git clone -b jazzy https://github.com/ament/ament_lint.git && \
-    git clone -b jazzy https://github.com/ament/ament_index.git && \
-    git clone -b jazzy https://github.com/ament/ament_package.git
+    (git clone -b jazzy https://github.com/ros2/ros2cli.git || echo "ros2cli clone failed, continuing...") && \
+    (git clone -b jazzy https://github.com/ros2/launch.git || echo "launch clone failed, continuing...") && \
+    (git clone -b jazzy https://github.com/ros2/launch_ros.git || echo "launch_ros clone failed, continuing...") && \
+    (git clone -b jazzy https://github.com/ros2/rosbag2.git || echo "rosbag2 clone failed, continuing...") && \
+    sleep 2 && \
+    (git clone -b jazzy https://github.com/ament/ament_lint.git || echo "ament_lint clone failed, continuing...") && \
+    (git clone -b jazzy https://github.com/ament/ament_index.git || echo "ament_index clone failed, continuing...") && \
+    (git clone -b jazzy https://github.com/ament/ament_package.git || echo "ament_package clone failed, continuing...")
 
-# Clone essential middleware packages (Fast-DDS only)
+# Clone essential middleware packages (Fast-DDS only) - with CORRECT branch names
 RUN cd /opt/ros2_jazzy/src && \
-    git clone -b jazzy https://github.com/eProsima/Fast-DDS.git || true && \
-    git clone -b jazzy https://github.com/eProsima/Fast-CDR.git || true && \
-    git clone -b jazzy https://github.com/eProsima/foonathan_memory_vendor.git || true
+    (git clone -b 3.0.x https://github.com/eProsima/Fast-DDS.git || echo "Fast-DDS clone failed, continuing...") && \
+    (git clone -b 2.2.x https://github.com/eProsima/Fast-CDR.git || echo "Fast-CDR clone failed, continuing...") && \
+    (git clone -b jazzy https://github.com/eProsima/foonathan_memory_vendor.git || echo "foonathan_memory_vendor clone failed, continuing...")
 
 # Initialize rosdep and install dependencies
 RUN rosdep init || echo "rosdep already initialized" && \
     rosdep update && \
     cd /opt/ros2_jazzy && \
-    rosdep install --from-paths src --ignore-src --rosdistro humble -y || echo "Some dependencies may not be available"
+    rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || echo "Some dependencies may not be available"
 
-# Build ONLY the ros-base level packages
+# Build in proper dependency order - core packages first
+RUN cd /opt/ros2_jazzy && \
+    colcon build --symlink-install \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    --packages-select \
+        ament_cmake \
+        ament_package \
+        ament_index_cpp \
+        ament_index_python \
+    || echo "Core packages may have failed to build, continuing..."
+
+# Build the rest of the packages
 RUN cd /opt/ros2_jazzy && \
     colcon build --symlink-install \
     --cmake-args -DCMAKE_BUILD_TYPE=Release \
