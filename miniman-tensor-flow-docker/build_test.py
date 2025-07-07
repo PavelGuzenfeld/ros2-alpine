@@ -8,11 +8,22 @@ print("--- TensorFlow GPU Verification ---")
 print(f"TensorFlow Version: {tf.__version__}")
 print(f"Python Version: {sys.version}")
 
+# Configure GPU memory growth to prevent OOM
+try:
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    if physical_devices:
+        for device in physical_devices:
+            tf.config.experimental.set_memory_growth(device, True)
+        print("SUCCESS: GPU memory growth configured")
+except Exception as e:
+    print(f"WARNING: Could not configure GPU memory growth: {e}")
+
 gpu_devices = tf.config.list_physical_devices('GPU')
 
 if not gpu_devices:
     print("\nERROR: No GPU detected by TensorFlow.")
     print("Please ensure the container was started with '--runtime nvidia'.")
+    sys.exit(1)
 
 print(f"\nSUCCESS: Found {len(gpu_devices)} GPU(s):")
 for device in gpu_devices:
@@ -24,16 +35,29 @@ for device in gpu_devices:
 
 try:
     print("\n--- Performing a simple GPU computation... ---")
+    
+    # Use smaller matrices and limit memory usage for Jetson
     with tf.device('/GPU:0'):
-        a = tf.constant([[1.0, 2.0], [3.0, 4.0]], dtype=tf.float32)
-        b = tf.constant([[1.0, 1.0], [0.0, 1.0]], dtype=tf.float32)
+        # Smaller test to avoid OOM on Jetson devices
+        a = tf.constant([[1.0, 2.0]], dtype=tf.float32)  # Smaller matrix
+        b = tf.constant([[1.0], [1.0]], dtype=tf.float32)  # Smaller matrix
         c = tf.matmul(a, b)
     
     print("SUCCESS: GPU computation test passed.")
     print("Result of matrix multiplication on GPU:")
     print(c.numpy())
+    
+    # Test memory info if available
+    try:
+        memory_info = tf.config.experimental.get_memory_info('GPU:0')
+        print(f"GPU Memory - Current: {memory_info['current']//1024//1024} MB, Peak: {memory_info['peak']//1024//1024} MB")
+    except Exception as e:
+        print("GPU memory info not available")
+        
 except Exception as e:
     print(f"\nERROR: GPU computation test failed: {e}")
+    print("This might be due to insufficient GPU memory on Jetson devices.")
+    # Don't exit here, continue with other tests
 
 print("\n--- OpenCV Verification ---")
 try:
@@ -46,6 +70,7 @@ try:
     print("SUCCESS: OpenCV basic operations passed.")
 except Exception as e:
     print(f"ERROR: OpenCV verification failed: {e}")
+    sys.exit(1)
 
 print("\n--- GStreamer Support Verification ---")
 try:
@@ -153,4 +178,4 @@ try:
 except:
     print("Could not retrieve CUDA/cuDNN version info.")
 
-print("\n--- All Verifications Passed ---")
+print("\n--- All Core Verifications Completed ---")
