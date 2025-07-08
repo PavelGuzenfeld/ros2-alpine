@@ -212,21 +212,42 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy ROS2 Humble installation from dustynv's working container
 COPY --from=ros2_source /opt/ros/humble /opt/ros/humble
 
-# Copy specific libraries that may be needed for ROS2 to work
-# We'll try to copy them and ignore failures
-RUN mkdir -p /tmp/lib_check
-COPY --from=ros2_source /usr/lib/aarch64-linux-gnu/libspdlog.so* /tmp/lib_check/ 2>/dev/null || echo "libspdlog not found in source"
-COPY --from=ros2_source /usr/lib/aarch64-linux-gnu/libfmt.so* /tmp/lib_check/ 2>/dev/null || echo "libfmt not found in source"
-
-# Copy any found libraries to system location
-RUN if [ -f /tmp/lib_check/libspdlog.so.1 ]; then \
-        cp /tmp/lib_check/libspdlog.so* /usr/lib/aarch64-linux-gnu/ 2>/dev/null || true; \
-    fi && \
-    if [ -f /tmp/lib_check/libfmt.so* ]; then \
-        cp /tmp/lib_check/libfmt.so* /usr/lib/aarch64-linux-gnu/ 2>/dev/null || true; \
-    fi && \
-    rm -rf /tmp/lib_check && \
+# Build spdlog v1.8.5 from source (version that ROS2 Humble expects)
+RUN apt-get update && apt-get install -y --no-install-recommends git cmake build-essential && \
+    git clone --depth 1 --branch v1.8.5 https://github.com/gabime/spdlog.git /tmp/spdlog && \
+    cd /tmp/spdlog && mkdir build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSPDLOG_BUILD_SHARED=ON && \
+    make -j$(nproc) && make install && \
+    cd / && rm -rf /tmp/spdlog && \
+    apt-get remove -y git cmake build-essential && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* && \
     ldconfig
+
+# Create a simple script to handle missing library symlinks at runtime
+RUN echo '#!/bin/bash\n\
+# Create symlinks for commonly missing libraries\n\
+echo "Checking for missing ROS2 libraries..."\n\
+\n\
+# Look for spdlog library in ROS2 installation\n\
+SPDLOG_LIB=$(find /opt/ros/humble -name "*spdlog*" -name "*.so*" 2>/dev/null | head -n1)\n\
+if [ -n "$SPDLOG_LIB" ] && [ ! -f /usr/lib/aarch64-linux-gnu/libspdlog.so.1 ]; then\n\
+  echo "Found spdlog library: $SPDLOG_LIB"\n\
+  ln -sf "$SPDLOG_LIB" /usr/lib/aarch64-linux-gnu/libspdlog.so.1 2>/dev/null || true\n\
+  ln -sf "$SPDLOG_LIB" /usr/lib/aarch64-linux-gnu/libspdlog.so 2>/dev/null || true\n\
+fi\n\
+\n\
+# Look for fmt library in ROS2 installation\n\
+FMT_LIB=$(find /opt/ros/humble -name "*fmt*" -name "*.so*" 2>/dev/null | head -n1)\n\
+if [ -n "$FMT_LIB" ] && [ ! -f /usr/lib/aarch64-linux-gnu/libfmt.so ]; then\n\
+  echo "Found fmt library: $FMT_LIB"\n\
+  ln -sf "$FMT_LIB" /usr/lib/aarch64-linux-gnu/libfmt.so 2>/dev/null || true\n\
+fi\n\
+\n\
+# Update library cache\n\
+ldconfig 2>/dev/null || true\n\
+echo "Library setup complete."\n\
+' > /usr/local/bin/fix_ros_libs.sh && chmod +x /usr/local/bin/fix_ros_libs.sh
 
 # Install additional ROS2 Python dependencies via pip if needed
 RUN pip3 install --no-cache-dir \
@@ -269,6 +290,10 @@ ENV ROS_DISTRO=humble
 ENV ROS_VERSION=2
 ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 ENV PYTHONPATH="/usr/local/lib/python3.8/site-packages:${PYTHONPATH}"
+ENV AMENT_PREFIX_PATH="/opt/ros/humble/install"
+ENV CMAKE_PREFIX_PATH="/opt/ros/humble/install"
+ENV PATH="/opt/ros/humble/install/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/opt/ros/humble/install/lib:${LD_LIBRARY_PATH}"
 
 # Create workspace
 RUN mkdir -p /workspace/
