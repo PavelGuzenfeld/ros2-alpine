@@ -216,7 +216,12 @@ COPY --from=ros2_source /opt/ros/humble /opt/ros/humble
 RUN apt-get update && apt-get install -y --no-install-recommends git cmake build-essential && \
     git clone --depth 1 --branch v1.8.5 https://github.com/gabime/spdlog.git /tmp/spdlog && \
     cd /tmp/spdlog && mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSPDLOG_BUILD_SHARED=ON && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release \
+             -DCMAKE_INSTALL_PREFIX=/usr \
+             -DSPDLOG_BUILD_SHARED=ON \
+             -DSPDLOG_BUILD_EXAMPLE=OFF \
+             -DSPDLOG_BUILD_TESTS=OFF \
+             -DSPDLOG_BUILD_BENCH=OFF && \
     make -j$(nproc) && make install && \
     cd / && rm -rf /tmp/spdlog && \
     apt-get remove -y git cmake build-essential && \
