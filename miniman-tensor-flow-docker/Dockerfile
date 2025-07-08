@@ -338,7 +338,7 @@ RUN printf '#!/bin/bash\nset -e\n\n# Source ROS2 environment\nif [ -f /opt/ros/h
     chmod +x /ros_entrypoint.sh
 
 # Copy test script
-COPY test_jetson.py /test/test_jetson.py
+COPY jetson_test.py /test/jetson_test.py
 
 ENV DEBIAN_FRONTEND=
 ENTRYPOINT ["/ros_entrypoint.sh"]
