@@ -429,16 +429,11 @@ RUN echo "=== Stage 3: Building ROSIDL System ===" && \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ || (echo "ROSIDL BUILD FAILED" && exit 1)
 
-# Stage 4: List available packages and build dynamic typesupport 
-RUN echo "=== Stage 4: Building Dynamic Typesupport (Conservative Approach) ===" && \
+# Stage 4: Build dynamic typesupport and check what packages exist
+RUN echo "=== Stage 4: Building Dynamic Typesupport ===" && \
     source install/setup.bash && \
-    echo "=== DIAGNOSTIC: Available packages in rosidl_dynamic_typesupport ===" && \
-    find src -name "package.xml" | grep -i dynamic | xargs grep -l "package.*name" | while read f; do \
-        echo "Package file: $f"; \
-        grep "<name>" "$f" || true; \
-    done && \
-    echo "=== DIAGNOSTIC: Checking what's in install directory after ROSIDL build ===" && \
-    ls -la install/*/share/ | grep -i dynamic || true && \
+    echo "=== Available packages check ===" && \
+    colcon list --names-only | grep -E "(dynamic|typesupport)" || true && \
     echo "=== Building rosidl_dynamic_typesupport ===" && \
     colcon build --symlink-install \
     --packages-up-to \
@@ -446,30 +441,26 @@ RUN echo "=== Stage 4: Building Dynamic Typesupport (Conservative Approach) ==="
         rmw \
         rmw_dds_common \
         rmw_fastrtps_shared_cpp \
-        rmw_fastrtps_cpp \
-        rmw_implementation \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ || (echo "DYNAMIC TYPESUPPORT BUILD FAILED" && exit 1)
 
-# Stage 5: Try to build RMW packages individually to see which fails
-RUN echo "=== Stage 5: Building RMW packages step by step ===" && \
+# Stage 5: Try to build rmw_fastrtps_cpp with diagnostics
+RUN echo "=== Stage 5: Building RMW FastRTPS packages with diagnostics ===" && \
     source install/setup.bash && \
-    echo "Trying rmw_fastrtps_shared_cpp first..." && \
+    echo "=== Checking available packages ===" && \
+    colcon list --names-only | grep fastrtps || true && \
+    echo "=== Checking installed packages ===" && \
+    ls -la install/ | grep -E "(rosidl|rmw)" || true && \
+    echo "=== Trying rmw_fastrtps_shared_cpp first ===" && \
     colcon build --symlink-install \
     --packages-select rmw_fastrtps_shared_cpp \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ && \
-    echo "Now trying rmw_fastrtps_cpp..." && \
+    echo "=== Now trying rmw_fastrtps_cpp with cmake debug ===" && \
     colcon build --symlink-install \
-    --packages-up-to \
-    rmw_fastrtps_cpp \
-    builtin_interfaces \
-    unique_identifier_msgs \
-    rcl_interfaces \
-    common_interfaces \
-    rcl \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ || (echo "RMW BUILD FAILED - but continuing..." && true)
+    --packages-select rmw_fastrtps_cpp \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCMAKE_FIND_DEBUG_MODE=ON \
+    --event-handlers console_direct+ || (echo "RMW FastRTPS BUILD FAILED - continuing..." && true)
 
 # Stage 6: Build everything else, excluding broken RMW packages if needed
 RUN echo "=== Stage 6: Building All Remaining Packages ===" && \
