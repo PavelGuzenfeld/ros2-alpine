@@ -404,13 +404,74 @@ RUN echo "=== Stage 2: Building ROSIDL packages ===" && \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ || (echo "ROSIDL BUILD FAILED" && exit 1)
 
-# Stage 3: Build the rest of the packages now that the foundation and generators are complete.
-RUN echo "=== Stage 3: Building All Remaining Packages ===" && \
+# Stage 3: Build core RCL and ROS2 packages, excluding problematic test packages
+RUN echo "=== Stage 3: Building Core ROS2 Packages ===" && \
     source install/setup.bash && \
     colcon build --symlink-install \
+    --packages-up-to \
+        rcl \
+        rclcpp \
+        rclcpp_action \
+        rclcpp_components \
+        rclcpp_lifecycle \
+        rcl_action \
+        rcl_lifecycle \
+        rcl_logging_interface \
+        rcl_logging_noop \
+        rcl_yaml_param_parser \
+        rclpy \
+        rmw \
+        rmw_implementation \
+        rmw_fastrtps_cpp \
+        rmw_fastrtps_shared_cpp \
+        rosidl_runtime_c \
+        rosidl_runtime_cpp \
+        rosidl_typesupport_c \
+        rosidl_typesupport_cpp \
+        rosidl_typesupport_fastrtps_c \
+        rosidl_typesupport_fastrtps_cpp \
+        rosidl_typesupport_introspection_c \
+        rosidl_typesupport_introspection_cpp \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ || (echo "FINAL BUILD FAILED" && exit 1)
+    --event-handlers console_direct+ || (echo "CORE ROS2 BUILD FAILED" && exit 1)
 
+# Stage 4: Build remaining packages while excluding test fixtures and problematic packages
+RUN echo "=== Stage 4: Building Remaining Packages ===" && \
+    source install/setup.bash && \
+    colcon build --symlink-install \
+    --packages-skip \
+        ros2lifecycle_test_fixtures \
+        test_msgs \
+        test_rclcpp \
+        test_communication \
+        demo_nodes_cpp_rosnative \
+        lifecycle \
+        pendulum_control \
+        pendulum_msgs \
+        quality_of_service_demo_cpp \
+        quality_of_service_demo_py \
+        topic_monitor \
+        composition \
+        examples_rclcpp_minimal_action_client \
+        examples_rclcpp_minimal_action_server \
+        examples_rclcpp_minimal_client \
+        examples_rclcpp_minimal_composition \
+        examples_rclcpp_minimal_publisher \
+        examples_rclcpp_minimal_service \
+        examples_rclcpp_minimal_subscriber \
+        examples_rclcpp_minimal_timer \
+        examples_rclcpp_multithreaded_executor \
+        examples_rclpy_executors \
+        examples_rclpy_minimal_action_client \
+        examples_rclpy_minimal_action_server \
+        examples_rclpy_minimal_client \
+        examples_rclpy_minimal_publisher \
+        examples_rclpy_minimal_service \
+        examples_rclpy_minimal_subscriber \
+        ament_cmake_clang_tidy \
+        lttngpy \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+    --event-handlers console_direct+ || (echo "REMAINING BUILD FAILED" && exit 1)
 
 # Set up ROS2 environment
 ENV ROS_DISTRO=jazzy
