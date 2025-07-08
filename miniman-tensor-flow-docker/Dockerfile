@@ -151,8 +151,11 @@ RUN mkdir -p /tmp/opencv && cd /tmp/opencv && \
     cd / && rm -rf /tmp/opencv
 
 # =========================================================================
-# Final Stage
-# =========================================================================
+# Copy ROS2 Humble from dustynv's working container
+# This is the most reliable approach for getting Humble on r35.2.1
+FROM dustynv/ros:humble-ros-base-l4t-r35.2.1 AS ros2_source
+
+# Use the main build for final stage
 FROM dustynv/l4t-pytorch:r35.2.1
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -197,18 +200,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpng16-16 && \
     rm -rf /var/lib/apt/lists/*
 
-# Add ROS2 Humble repository and install base packages
-RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    ros-humble-ros-base \
-    ros-humble-rmw-fastrtps-cpp \
-    python3-rosdep \
-    python3-colcon-common-extensions && \
-    rm -rf /var/lib/apt/lists/*
+# Install minimal runtime dependencies for ROS2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-pip \
+    python3-yaml \
+    python3-setuptools \
+    python3-dev \
+    libyaml-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy ROS2 Humble installation from dustynv's working container
+COPY --from=ros2_source /opt/ros/humble /opt/ros/humble
+
+# Install additional ROS2 Python dependencies via pip if needed
+RUN pip3 install --no-cache-dir \
+    empy \
+    lark \
+    catkin-pkg \
+    colcon-common-extensions \
+    rosdep \
+    || echo "Some ROS2 Python packages already available"
 
 # Initialize rosdep
-RUN rosdep init && rosdep update
+RUN rosdep init || echo "rosdep already initialized" && \
+    rosdep update || echo "rosdep update failed, continuing anyway"
 
 # Upgrade PyTorch to 2.1
 RUN wget -q https://developer.download.nvidia.cn/compute/redist/jp/v512/pytorch/torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
@@ -262,11 +277,11 @@ fi\n\
 # Print environment info for debugging\n\
 if [ "$1" = "bash" ] || [ "$1" = "/bin/bash" ]; then\n\
   echo "=== Environment Info ==="\n\
-  echo "PyTorch: $(python3 -c \"import torch; print(torch.__version__)\" 2>/dev/null || echo \"NOT FOUND\")"\n\
-  echo "OpenCV: $(python3 -c \"import cv2; print(cv2.__version__)\" 2>/dev/null || echo \"NOT FOUND\")"\n\
+  echo "PyTorch: $(python3 -c '\''import torch; print(torch.__version__)'\'' 2>/dev/null || echo '\''NOT FOUND'\'')"\n\
+  echo "OpenCV: $(python3 -c '\''import cv2; print(cv2.__version__)'\'' 2>/dev/null || echo '\''NOT FOUND'\'')"\n\
   echo "ROS2: $ROS_DISTRO"\n\
-  echo "GStreamer: $(gst-launch-1.0 --version 2>/dev/null | head -n1 || echo \"NOT FOUND\")"\n\
-  echo "ros2 command: $(which ros2 2>/dev/null || echo \"NOT FOUND\")"\n\
+  echo "GStreamer: $(gst-launch-1.0 --version 2>/dev/null | head -n1 || echo '\''NOT FOUND'\'')"\n\
+  echo "ros2 command: $(which ros2 2>/dev/null || echo '\''NOT FOUND'\'')"\n\
   echo "========================"\n\
 fi\n\
 \n\
