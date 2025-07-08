@@ -174,15 +174,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     curl \
     lsb-release \
-    # CUDA runtime libraries for PyTorch
-    cuda-runtime-11-4 \
-    libcublas11 \
-    libcublaslt11 \
-    libcufft10 \
-    libcurand10 \
-    libcusolver11 \
-    libcusparse11 \
-    libnpp11 \
     # GStreamer runtime deps
     libglib2.0-0 \
     libcairo2 \
