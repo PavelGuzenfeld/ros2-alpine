@@ -167,37 +167,7 @@ ENV GST_PLUGIN_PATH="/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/workspace/install
 ENV PYTHONPATH="/usr/lib/python3/site-packages"
 ENV LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libGLdispatch.so"
 
-# Install runtime dependencies and ROS2 Humble base
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    wget \
-    gnupg \
-    curl \
-    lsb-release \
-    # GStreamer runtime deps
-    libglib2.0-0 \
-    libcairo2 \
-    libgirepository-1.0-1 \
-    libavcodec58 \
-    libavformat58 \
-    libavutil56 \
-    libswscale5 \
-    liborc-0.4-0 \
-    libxml2 \
-    libpopt0 \
-    libffi7 \
-    libpcre2-8-0 \
-    zlib1g \
-    libssl1.1 \
-    libv4l-0 \
-    v4l-utils \
-    python3-gi \
-    python3-gi-cairo \
-    gir1.2-glib-2.0 \
-    gir1.2-gstreamer-1.0 \
-    # OpenCV runtime deps
-    libjpeg8 \
-    libpng16-16 \
     ca-certificates \
     wget \
     gnupg \
@@ -241,47 +211,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy ROS2 Humble installation from dustynv's working container
 COPY --from=ros2_source /opt/ros/humble /opt/ros/humble
 
-# Build spdlog v1.8.5 from source (version that ROS2 Humble expects)
-RUN apt-get update && apt-get install -y --no-install-recommends git cmake build-essential && \
-    git clone --depth 1 --branch v1.8.5 https://github.com/gabime/spdlog.git /tmp/spdlog && \
-    cd /tmp/spdlog && mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release \
-             -DCMAKE_INSTALL_PREFIX=/usr \
-             -DSPDLOG_BUILD_SHARED=ON \
-             -DSPDLOG_BUILD_EXAMPLE=OFF \
-             -DSPDLOG_BUILD_TESTS=OFF \
-             -DSPDLOG_BUILD_BENCH=OFF && \
-    make -j$(nproc) && make install && \
-    cd / && rm -rf /tmp/spdlog && \
-    apt-get remove -y git cmake build-essential && \
+# CRITICAL FIX: DO NOT build custom spdlog - use what comes with ROS2
+# Remove any system spdlog that might conflict and ensure ROS2's libraries take precedence
+RUN apt-get update && apt-get remove -y libspdlog* || true && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/* && \
+    # Ensure ROS2 libraries are found first
+    echo "/opt/ros/humble/install/lib" > /etc/ld.so.conf.d/000-ros2.conf && \
     ldconfig
-
-# Create a simple script to handle missing library symlinks at runtime
-RUN echo '#!/bin/bash\n\
-# Create symlinks for commonly missing libraries\n\
-echo "Checking for missing ROS2 libraries..."\n\
-\n\
-# Look for spdlog library in ROS2 installation\n\
-SPDLOG_LIB=$(find /opt/ros/humble -name "*spdlog*" -name "*.so*" 2>/dev/null | head -n1)\n\
-if [ -n "$SPDLOG_LIB" ] && [ ! -f /usr/lib/aarch64-linux-gnu/libspdlog.so.1 ]; then\n\
-  echo "Found spdlog library: $SPDLOG_LIB"\n\
-  ln -sf "$SPDLOG_LIB" /usr/lib/aarch64-linux-gnu/libspdlog.so.1 2>/dev/null || true\n\
-  ln -sf "$SPDLOG_LIB" /usr/lib/aarch64-linux-gnu/libspdlog.so 2>/dev/null || true\n\
-fi\n\
-\n\
-# Look for fmt library in ROS2 installation\n\
-FMT_LIB=$(find /opt/ros/humble -name "*fmt*" -name "*.so*" 2>/dev/null | head -n1)\n\
-if [ -n "$FMT_LIB" ] && [ ! -f /usr/lib/aarch64-linux-gnu/libfmt.so ]; then\n\
-  echo "Found fmt library: $FMT_LIB"\n\
-  ln -sf "$FMT_LIB" /usr/lib/aarch64-linux-gnu/libfmt.so 2>/dev/null || true\n\
-fi\n\
-\n\
-# Update library cache\n\
-ldconfig 2>/dev/null || true\n\
-echo "Library setup complete."\n\
-' > /usr/local/bin/fix_ros_libs.sh && chmod +x /usr/local/bin/fix_ros_libs.sh
 
 # Install additional ROS2 Python dependencies via pip if needed
 RUN pip3 install --no-cache-dir \
@@ -300,8 +237,17 @@ RUN rosdep init || echo "rosdep already initialized" && \
 RUN wget -q https://developer.download.nvidia.cn/compute/redist/jp/v512/pytorch/torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
     pip3 install torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
     rm torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
 
+# CUDA Library Path Fix for PyTorch
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/cuda/targets/aarch64-linux/lib:/opt/ros/humble/install/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu:${LD_LIBRARY_PATH}"
+
+# Create CUDA library symlinks for PyTorch compatibility
+RUN ln -sf /usr/local/cuda/targets/aarch64-linux/lib/libcublas.so /usr/lib/aarch64-linux-gnu/libcublas.so || true && \
+    ln -sf /usr/local/cuda/targets/aarch64-linux/lib/libcublasLt.so /usr/lib/aarch64-linux-gnu/libcublasLt.so || true && \
+    ln -sf /usr/local/cuda/targets/aarch64-linux/lib/libcurand.so /usr/lib/aarch64-linux-gnu/libcurand.so || true && \
+    ln -sf /usr/local/cuda/targets/aarch64-linux/lib/libcusparse.so /usr/lib/aarch64-linux-gnu/libcusparse.so || true && \
+    ln -sf /usr/local/cuda/targets/aarch64-linux/lib/libcusolver.so /usr/lib/aarch64-linux-gnu/libcusolver.so || true && \
+    ldconfig
 
 # Install additional Python dependencies
 RUN pip3 install --no-cache-dir click PyGObject
@@ -316,12 +262,15 @@ COPY --from=builder /usr/include/gstreamer-1.0/ /usr/include/gstreamer-1.0/
 COPY --from=builder /usr/local/lib/libopencv* /usr/local/lib/
 COPY --from=builder /usr/local/lib/python3.8/site-packages/cv2/ /usr/local/lib/python3.8/site-packages/cv2/
 
-# Update library cache
-RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && \
-    echo "/usr/lib/aarch64-linux-gnu" > /etc/ld.so.conf.d/gstreamer.conf && \
+# Update library cache with proper ordering
+RUN echo "/opt/ros/humble/install/lib" > /etc/ld.so.conf.d/000-ros2.conf && \
+    echo "/usr/local/cuda/lib64" > /etc/ld.so.conf.d/001-cuda.conf && \
+    echo "/usr/local/cuda/targets/aarch64-linux/lib" > /etc/ld.so.conf.d/002-cuda-targets.conf && \
+    echo "/usr/local/lib" > /etc/ld.so.conf.d/003-opencv.conf && \
+    echo "/usr/lib/aarch64-linux-gnu" > /etc/ld.so.conf.d/004-gstreamer.conf && \
     ldconfig
 
-# Set up ROS2 environment
+# Set up ROS2 environment with fixed library paths
 ENV ROS_DISTRO=humble
 ENV ROS_VERSION=2
 ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
@@ -329,7 +278,6 @@ ENV PYTHONPATH="/usr/local/lib/python3.8/site-packages:/opt/ros/humble/install/l
 ENV AMENT_PREFIX_PATH="/opt/ros/humble/install"
 ENV CMAKE_PREFIX_PATH="/opt/ros/humble/install"
 ENV PATH="/opt/ros/humble/install/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/opt/ros/humble/install/lib:${LD_LIBRARY_PATH}"
 
 # Create workspace
 RUN mkdir -p /workspace/
