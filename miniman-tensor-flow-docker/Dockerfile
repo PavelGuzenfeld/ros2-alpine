@@ -133,13 +133,19 @@ RUN mkdir -p /tmp/opencv && cd /tmp/opencv && \
         -DBUILD_PERF_TESTS=OFF \
         -DBUILD_EXAMPLES=OFF \
         -DBUILD_DOCS=OFF \
+        -DBUILD_opencv_apps=OFF \
         -DWITH_CUDA=OFF \
-        -DWITH_GSTREAMER=ON \
+        -DWITH_GSTREAMER=OFF \
         -DWITH_FFMPEG=ON \
         -DWITH_V4L=ON \
         -DWITH_LIBV4L=ON \
         -DWITH_GTK=OFF \
-        -DWITH_QT=OFF && \
+        -DWITH_QT=OFF \
+        -DWITH_1394=OFF \
+        -DWITH_VTK=OFF \
+        -DWITH_OPENEXR=OFF \
+        -DWITH_WEBP=OFF \
+        -DWITH_TIFF=OFF && \
     cmake --build build -j"$(nproc)" && \
     cmake --install build && \
     cd / && rm -rf /tmp/opencv
