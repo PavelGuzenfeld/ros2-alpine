@@ -212,6 +212,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy ROS2 Humble installation from dustynv's working container
 COPY --from=ros2_source /opt/ros/humble /opt/ros/humble
 
+# Copy specific libraries that may be needed for ROS2 to work
+# We'll try to copy them and ignore failures
+RUN mkdir -p /tmp/lib_check
+COPY --from=ros2_source /usr/lib/aarch64-linux-gnu/libspdlog.so* /tmp/lib_check/ 2>/dev/null || echo "libspdlog not found in source"
+COPY --from=ros2_source /usr/lib/aarch64-linux-gnu/libfmt.so* /tmp/lib_check/ 2>/dev/null || echo "libfmt not found in source"
+
+# Copy any found libraries to system location
+RUN if [ -f /tmp/lib_check/libspdlog.so.1 ]; then \
+        cp /tmp/lib_check/libspdlog.so* /usr/lib/aarch64-linux-gnu/ 2>/dev/null || true; \
+    fi && \
+    if [ -f /tmp/lib_check/libfmt.so* ]; then \
+        cp /tmp/lib_check/libfmt.so* /usr/lib/aarch64-linux-gnu/ 2>/dev/null || true; \
+    fi && \
+    rm -rf /tmp/lib_check && \
+    ldconfig
+
 # Install additional ROS2 Python dependencies via pip if needed
 RUN pip3 install --no-cache-dir \
     empy \
