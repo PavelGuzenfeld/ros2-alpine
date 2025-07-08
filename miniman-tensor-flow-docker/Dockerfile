@@ -1,36 +1,20 @@
-# Jetson Xavier TensorFlow 2.11.0 + GStreamer 1.24.9 + OpenCV 4.12 + ROS2 Jazzy
-FROM nvcr.io/nvidia/l4t-base:r35.2.1 AS builder
+# Minimal Jetson Xavier: PyTorch 2.1 + OpenCV 4.8.1 + ROS2 Humble + GStreamer 1.24.9
+FROM dustynv/l4t-pytorch:r35.2.1 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# build-time deps and python venv setup
+# Install minimal build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
     cmake \
     ninja-build \
-    curl \
     wget \
     ca-certificates \
     python3-dev \
-    python3-pip \
-    python3-venv \
-    libhdf5-dev \
-    libopenblas-dev \
-    liblapack-dev \
-    gfortran \
     pkg-config \
     flex \
     bison \
-    nasm \
-    gettext \
-    libudev-dev \
-    libasound2-dev \
-    libdrm-dev \
-    libgudev-1.0-dev \
-    libgles2-mesa-dev \
-    libegl1-mesa-dev \
-    libmount-dev \
     libglib2.0-dev \
     libcairo2-dev \
     libgirepository1.0-dev \
@@ -38,7 +22,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libavformat-dev \
     libavutil-dev \
     libswscale-dev \
-    libavresample-dev \
     liborc-0.4-dev \
     libxml2-dev \
     libpopt-dev \
@@ -46,55 +29,35 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpcre2-dev \
     zlib1g-dev \
     libssl-dev \
-    libasound2-dev \
-    libpulse-dev \
-    libx11-dev \
-    libxext-dev \
-    libxfixes-dev \
-    libxi-dev \
-    libxrender-dev \
-    libxrandr-dev \
-    libxss-dev \
-    libgdk-pixbuf2.0-dev \
-    libepoxy-dev \
-    libxkbcommon-dev \
-    libwayland-dev \
-    libopus-dev \
-    libvorbis-dev \
-    libtheora-dev \
-    libvpx-dev \
-    libmp3lame-dev \
-    libspeex-dev \
-    libflac-dev \
-    libpango1.0-dev \
+    libv4l-dev \
     libjpeg-dev \
     libpng-dev \
-    libv4l-dev && \
+    libudev-dev \
+    libasound2-dev \
+    libdrm-dev \
+    libgudev-1.0-dev \
+    libgles2-mesa-dev \
+    libegl1-mesa-dev \
+    libmount-dev \
+    libavcodec58 \
+    libavformat58 \
+    libavutil56 \
+    libswscale5 \
+    libtbb2 \
+    libtesseract4 \
+    libpangocairo-1.0-0 && \
     rm -rf /var/lib/apt/lists/*
 
-# Install newer Meson version required for GStreamer 1.24.9
+# Install Meson for GStreamer build
 RUN pip3 install meson==1.2.0
-
-# create python venv and install deps
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip wheel && \
-    pip install --no-cache-dir -r requirements.txt
 
 # Remove any existing GStreamer packages and build GStreamer 1.24.9 from source
 RUN apt-get update && \
-    apt-get install -y \
-    libudev-dev libasound2-dev libdrm-dev libgudev-1.0-dev \
-    libgles2-mesa-dev libegl1-mesa-dev libmount-dev flex bison \
-    libglib2.0-dev libcairo2-dev libavcodec58 libavformat58 \
-    libavutil56 libswscale5 libtbb2 libtesseract4 libpangocairo-1.0-0 libgirepository1.0-dev \
-    && pip3 install --upgrade pip \
-    && apt-get clean \
-    && apt-get remove -y *gstreamer* \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt autoremove -y
+    pip3 install --upgrade pip && \
+    apt-get clean && \
+    apt-get remove -y *gstreamer* && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt autoremove -y
 
 # Build and install GStreamer 1.24.9
 RUN mkdir -p /tmp/gst-1.24 && \
@@ -105,7 +68,7 @@ RUN mkdir -p /tmp/gst-1.24 && \
 
 WORKDIR /tmp/gst-1.24/gstreamer
 
-# Base GStreamer setup (without bad plugins)
+# Base GStreamer setup
 RUN meson setup builddir \
     --libdir=/usr/lib/aarch64-linux-gnu \
     --libexecdir=/usr/lib/aarch64-linux-gnu \
@@ -156,84 +119,53 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Clean up build directory
 RUN cd / && rm -rf /tmp/gst-1.24
 
-# Build OpenCV with custom GStreamer 1.24.9 integration
-WORKDIR /tmp
+# Build minimal OpenCV 4.8.1
 RUN mkdir -p /tmp/opencv && cd /tmp/opencv && \
-    git clone --depth 1 --branch 4.x https://github.com/opencv/opencv.git . && \
-    PY_SITEPACKAGES=$(python3 -c "import site; print(site.getsitepackages()[0])") && \
+    git clone --depth 1 --branch 4.8.1 https://github.com/opencv/opencv.git . && \
     PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:${PKG_CONFIG_PATH}" \
     cmake -S . -B build -G Ninja \
-    -D CMAKE_BUILD_TYPE=Release \
-    -D CMAKE_INSTALL_PREFIX=/usr/local \
-    -D CMAKE_PREFIX_PATH="/usr" \
-    -D PKG_CONFIG_EXECUTABLE=$(which pkg-config) \
-    -D BUILD_LIST=core,imgproc,imgcodecs,videoio,highgui,python3 \
-    -D BUILD_opencv_python3=ON \
-    -D OPENCV_PYTHON3_INSTALL_PATH="$PY_SITEPACKAGES" \
-    -D BUILD_SHARED_LIBS=ON \
-    -D BUILD_TESTS=OFF \
-    -D BUILD_PERF_TESTS=OFF \
-    -D BUILD_EXAMPLES=OFF \
-    -D BUILD_JPEG=OFF \
-    -D BUILD_PNG=OFF \
-    -D BUILD_PROTOBUF=OFF \
-    -D BUILD_ADE=ON \
-    -D WITH_CUDA=OFF \
-    -D WITH_GSTREAMER=ON \
-    -D WITH_FFMPEG=ON \
-    -D WITH_V4L=ON \
-    -D WITH_LIBV4L=ON && \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DBUILD_LIST=core,imgproc,imgcodecs,videoio,highgui,python3 \
+        -DBUILD_opencv_python3=ON \
+        -DBUILD_SHARED_LIBS=ON \
+        -DBUILD_TESTS=OFF \
+        -DBUILD_PERF_TESTS=OFF \
+        -DBUILD_EXAMPLES=OFF \
+        -DBUILD_DOCS=OFF \
+        -DWITH_CUDA=OFF \
+        -DWITH_GSTREAMER=ON \
+        -DWITH_FFMPEG=ON \
+        -DWITH_V4L=ON \
+        -DWITH_LIBV4L=ON \
+        -DWITH_GTK=OFF \
+        -DWITH_QT=OFF && \
     cmake --build build -j"$(nproc)" && \
     cmake --install build && \
-    rm -rf /tmp/opencv
+    cd / && rm -rf /tmp/opencv
 
 # =========================================================================
-# Final Stage with ROS2 Jazzy (Base Level Only - Fast-DDS middleware)
+# Final Stage
 # =========================================================================
-FROM nvcr.io/nvidia/l4t-base:r35.2.1
+FROM dustynv/l4t-pytorch:r35.2.1
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PATH="/opt/venv/bin:$PATH"
 ENV LD_LIBRARY_PATH="/usr/local/lib:/usr/lib/aarch64-linux-gnu:${LD_LIBRARY_PATH}"
 ENV PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:${PKG_CONFIG_PATH}"
-ENV GST_PLUGIN_PATH="/usr/lib/aarch64-linux-gnu/gstreamer-1.0"
 ENV PYTHON=/usr/bin/python3
-ENV GI_TYPELIB_PATH=/usr/lib/aarch64-linux-gnu/girepository-1.0
+ENV GI_TYPELIB_PATH="/usr/lib/aarch64-linux-gnu/girepository-1.0"
+ENV GST_PLUGIN_PATH="/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/workspace/install/lib/gstreamer-1.0"
 ENV PYTHONPATH="/usr/lib/python3/site-packages"
-ENV LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libgomp.so.1:/usr/lib/aarch64-linux-gnu/libGLdispatch.so"
-ENV GST_REGISTRY_UPDATE=no
-ENV GST_PLUGIN_SCANNER_TIMEOUT=5
-ENV GST_PLUGIN_SYSTEM_PATH=""
-ENV GST_DEBUG=0
+ENV LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libGLdispatch.so"
 
-# setup nvidia runtime deps and supporting libraries for GStreamer
+# Install runtime dependencies and ROS2 Humble base
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
     gnupg \
-    git \
-    build-essential \
-    cmake \
-    pkg-config \
-    python3 \
-    python3-pip \
-    python3-dev \
-    libopenblas-base \
-    liblapack3 \
-    cuda-runtime-11-4 \
-    libcudnn8 \
-    libnvinfer8 \
-    libnvinfer-plugin8 \
-    libnvonnxparsers8 \
-    libnvparsers8 \
-    libhdf5-dev \
-    libudev1 \
-    libasound2 \
-    libdrm2 \
-    libgudev-1.0-0 \
-    libgles2-mesa \
-    libegl1-mesa \
-    libmount1 \
+    curl \
+    lsb-release \
+    # GStreamer runtime deps
     libglib2.0-0 \
     libcairo2 \
     libgirepository-1.0-1 \
@@ -241,9 +173,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libavformat58 \
     libavutil56 \
     libswscale5 \
-    libtbb2 \
-    libtesseract4 \
-    libpangocairo-1.0-0 \
     liborc-0.4-0 \
     libxml2 \
     libpopt0 \
@@ -251,354 +180,93 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpcre2-8-0 \
     zlib1g \
     libssl1.1 \
-    libpulse0 \
-    libx11-6 \
-    libxext6 \
-    libxfixes3 \
-    libxi6 \
-    libxrender1 \
-    libxrandr2 \
-    libxss1 \
-    libgdk-pixbuf2.0-0 \
-    libepoxy0 \
-    libxkbcommon0 \
-    libwayland-client0 \
-    libwayland-cursor0 \
-    libwayland-egl1 \
-    libopus0 \
-    libvorbis0a \
-    libvorbisenc2 \
-    libtheora0 \
-    libvpx6 \
-    libmp3lame0 \
-    libspeex1 \
-    libflac8 \
-    libpango-1.0-0 \
-    libjpeg8 \
-    libpng16-16 \
     libv4l-0 \
     v4l-utils \
     python3-gi \
     python3-gi-cairo \
     gir1.2-glib-2.0 \
     gir1.2-gstreamer-1.0 \
-    software-properties-common \
-    lsb-release && \
+    # OpenCV runtime deps
+    libjpeg8 \
+    libpng16-16 && \
     rm -rf /var/lib/apt/lists/*
 
-# Install a newer version of CMake
-ENV CMAKE_VERSION=3.29.3
-RUN wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz -O /tmp/cmake.tar.gz && \
-    tar -zxvf /tmp/cmake.tar.gz -C /usr/local --strip-components=1 && \
-    rm /tmp/cmake.tar.gz
-
-
-# Install minimal system build dependencies and build LTTng from source
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libtinyxml2-dev \
-    libssl-dev \
-    libyaml-cpp-dev \
-    libacl1-dev \
-    uuid-dev \
-    libpopt-dev \
-    libxml2-dev \
-    libasio-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Build and install LTTng from source
-RUN mkdir -p /tmp/lttng && cd /tmp/lttng && \
-    # Always build userspace-rcu from source (system version is too old)
-    wget https://lttng.org/files/urcu/userspace-rcu-0.14.0.tar.bz2 && \
-    tar -xjf userspace-rcu-0.14.0.tar.bz2 && \
-    cd userspace-rcu-0.14.0 && \
-    ./configure --prefix=/usr && \
-    make -j$(nproc) && \
-    make install && \
-    ldconfig && \
-    cd .. && \
-    # Build LTTng-UST (disable NUMA support to avoid libnuma dependency)
-    wget https://lttng.org/files/lttng-ust/lttng-ust-2.13.6.tar.bz2 && \
-    tar -xjf lttng-ust-2.13.6.tar.bz2 && \
-    cd lttng-ust-2.13.6 && \
-    ./configure --prefix=/usr --disable-numa && \
-    make -j$(nproc) && \
-    make install && \
-    ldconfig && \
-    cd .. && \
-    # Build LTTng-Tools
-    wget https://lttng.org/files/lttng-tools/lttng-tools-2.13.11.tar.bz2 && \
-    tar -xjf lttng-tools-2.13.11.tar.bz2 && \
-    cd lttng-tools-2.13.11 && \
-    ./configure --prefix=/usr && \
-    make -j$(nproc) && \
-    make install && \
-    ldconfig && \
-    cd / && rm -rf /tmp/lttng
-
-# Install Python build dependencies
-RUN pip3 install --no-cache-dir --upgrade setuptools==58.2.0 \
-    colcon-common-extensions \
-    vcstool \
-    rosdep \
-    argcomplete \
-    flake8-blind-except \
-    flake8-builtins \
-    flake8-class-newline \
-    flake8-comprehensions \
-    flake8-deprecated \
-    flake8-docstrings \
-    flake8-import-order \
-    flake8-quotes \
-    pytest-repeat \
-    pytest-rerunfailures \
-    pytest \
-    lark \
-    empy \
-    pyyaml \
-    wheel \
-    pybind11 \
-    cython \
-    catkin-pkg \
-    distlib
-
-# Set compiler flags
-ENV MAKEFLAGS="-j2"
-ENV CFLAGS="-Wno-int-conversion -Wno-incompatible-pointer-types -Wno-error"
-ENV CXXFLAGS="-Wno-error -Wno-deprecated-declarations -Wno-stringop-overread"
-
-# Create ROS2 workspace
-RUN mkdir -p /opt/ros2_jazzy/src
-WORKDIR /opt/ros2_jazzy
-
-# Clone all required repositories
-COPY ros2.repos /opt/ros2_jazzy/
-RUN vcs import src < ros2.repos
+# Add ROS2 Humble repository and install base packages
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    ros-humble-ros-base \
+    ros-humble-rmw-fastrtps-cpp \
+    python3-rosdep \
+    python3-colcon-common-extensions && \
+    rm -rf /var/lib/apt/lists/*
 
 # Initialize rosdep
-RUN rosdep init || echo "rosdep already initialized" && \
-    rosdep update && \
-    rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || echo "Some dependencies may not be available; this is expected."
+RUN rosdep init && rosdep update
 
-# Set the default shell to bash for all subsequent RUN commands
-SHELL ["/bin/bash", "-c"]
+# Upgrade PyTorch to 2.1
+RUN wget -q https://developer.download.nvidia.cn/compute/redist/jp/v512/pytorch/torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
+    pip3 install torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
+    rm torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl
 
-# Stage 1: Build vendor packages and Fast-DDS first
-RUN echo "=== Stage 1: Building Vendor Packages and Fast-DDS ===" && \
-    colcon build --symlink-install \
-    --packages-up-to \
-        ament_lint \
-        ament_index_python \
-        fastcdr \
-        foonathan_memory_vendor \
-        fastrtps \
-        libyaml_vendor \
-        pybind11_vendor \
-        spdlog_vendor \
-        tinyxml2_vendor \
-        console_bridge_vendor \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ || (echo "VENDOR BUILD FAILED" && exit 1)
+# Install additional Python dependencies
+RUN pip3 install --no-cache-dir click PyGObject
 
-# Stage 2: Build foundation packages
-RUN echo "=== Stage 2: Building Foundation ===" && \
-    source install/setup.bash && \
-    colcon build --symlink-install \
-    --packages-up-to \
-        ament_lint \
-        ament_index_python \
-        ament_cmake_ros \
-        python_cmake_module \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ || (echo "FOUNDATION BUILD FAILED" && exit 1)
-
-# Stage 3: Build ROSIDL system with all dependencies
-RUN echo "=== Stage 3: Building ROSIDL System ===" && \
-    source install/setup.bash && \
-    colcon build --symlink-install \
-    --packages-up-to \
-        rosidl_generator_py \
-        rosidl_dynamic_typesupport \
-        rosidl_runtime_cpp \
-        rosidl_typesupport_cpp \
-        rosidl_typesupport_c \
-        rosidl_typesupport_fastrtps_cpp \
-        rosidl_typesupport_introspection_cpp \
-        rosidl_typesupport_fastrtps_c \
-        rosidl_typesupport_introspection_c \
-        test_interface_files \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ || (echo "ROSIDL BUILD FAILED" && exit 1)
-
-# Stage 4: Build dynamic typesupport and check what packages exist
-RUN echo "=== Stage 4: Building Dynamic Typesupport ===" && \
-    source install/setup.bash && \
-    echo "=== Available packages check ===" && \
-    colcon list --names-only | grep -E "(dynamic|typesupport)" || true && \
-    echo "=== Building rosidl_dynamic_typesupport ===" && \
-    colcon build --symlink-install \
-    --packages-up-to \
-        rosidl_dynamic_typesupport \
-        rmw \
-        rmw_dds_common \
-        rmw_fastrtps_shared_cpp \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ || (echo "DYNAMIC TYPESUPPORT BUILD FAILED" && exit 1)
-
-# Stage 5: Try to build rmw_fastrtps_cpp with diagnostics
-RUN echo "=== Stage 5: Building RMW FastRTPS packages with diagnostics ===" && \
-    source install/setup.bash && \
-    echo "=== Checking available packages ===" && \
-    colcon list --names-only | grep fastrtps || true && \
-    echo "=== Checking installed packages ===" && \
-    ls -la install/ | grep -E "(rosidl|rmw)" || true && \
-    echo "=== Trying rmw_fastrtps_shared_cpp first ===" && \
-    colcon build --symlink-install \
-    --packages-select rmw_fastrtps_shared_cpp \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ && \
-    echo "=== Now trying rmw_fastrtps_cpp with cmake debug ===" && \
-    colcon build --symlink-install \
-    --packages-select rmw_fastrtps_cpp \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCMAKE_FIND_DEBUG_MODE=ON \
-    --event-handlers console_direct+ || (echo "RMW FastRTPS BUILD FAILED - continuing..." && true)
-
-# Stage 6: Build essential ROS2 packages for CLI functionality
-RUN echo "=== Stage 6: Building Essential ROS2 CLI and Python Packages ===" && \
-    source install/setup.bash && \
-    echo "=== Building RCL and core packages ===" && \
-    colcon build --symlink-install \
-    --packages-up-to \
-        builtin_interfaces \
-        unique_identifier_msgs \
-        rcl_interfaces \
-        common_interfaces \
-        rcl \
-        rcl_logging_interface \
-        rcl_logging_spdlog \
-        rcpputils \
-        rclcpp \
-        rclpy \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ && \
-    echo "=== Building ROS2 CLI tools ===" && \
-    colcon build --symlink-install \
-    --packages-up-to \
-        ros2cli \
-        ros2cli_common_extensions \
-        ros2node \
-        ros2topic \
-        ros2service \
-        ros2param \
-        ros2action \
-        ros2pkg \
-        ros2interface \
-        ros2doctor \
-        ros2run \
-        ros2launch \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ || (echo "CLI BUILD FAILED - continuing with available packages" && true)
-
-# Stage 7: Build remaining packages, excluding problematic ones
-RUN echo "=== Stage 7: Building Remaining Packages ===" && \
-    source install/setup.bash && \
-    colcon build --symlink-install \
-    --packages-skip \
-        lttngpy \
-        test_msgs \
-        examples_rclcpp_minimal_action_client \
-        examples_rclcpp_minimal_action_server \
-        examples_rclcpp_minimal_client \
-        examples_rclcpp_minimal_composition \
-        examples_rclcpp_minimal_publisher \
-        examples_rclcpp_minimal_service \
-        examples_rclcpp_minimal_subscriber \
-        examples_rclcpp_minimal_timer \
-        examples_rclcpp_multithreaded_executor \
-        examples_rclpy_executors \
-        examples_rclpy_minimal_action_client \
-        examples_rclpy_minimal_action_server \
-        examples_rclpy_minimal_client \
-        examples_rclpy_minimal_publisher \
-        examples_rclpy_minimal_service \
-        examples_rclpy_minimal_subscriber \
-        demo_nodes_cpp \
-        demo_nodes_py \
-        quality_of_service_demo_cpp \
-        quality_of_service_demo_py \
-        lifecycle \
-        pendulum_control \
-        pendulum_msgs \
-        topic_monitor \
-        composition \
-        rmw_fastrtps_cpp \
-        rmw_fastrtps_dynamic_cpp \
-    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ || (echo "FINAL BUILD COMPLETED WITH SOME FAILURES" && true)
-
-# Set up ROS2 environment
-ENV ROS_DISTRO=jazzy
-ENV AMENT_PREFIX_PATH=/opt/ros2_jazzy/install
-ENV COLCON_PREFIX_PATH=/opt/ros2_jazzy/install
-ENV LD_LIBRARY_PATH=/opt/ros2_jazzy/install/lib:$LD_LIBRARY_PATH
-ENV PATH=/opt/ros2_jazzy/install/bin:$PATH
-ENV PYTHONPATH=/opt/ros2_jazzy/install/local/lib/python3.8/site-packages:/opt/ros2_jazzy/install/lib/python3.8/site-packages:$PYTHONPATH
-ENV ROS_PYTHON_VERSION=3
-ENV ROS_VERSION=2
-ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-
-# Revert to default shell
-SHELL ["/bin/sh", "-c"]
-ENV DEBIAN_FRONTEND=
-
-# add Jetson repo keys
-RUN apt-key adv --fetch-keys https://repo.download.nvidia.com/jetson/jetson-ota-public.asc && \
-    echo "deb https://repo.download.nvidia.com/jetson/common r35.2 main" > /etc/apt/sources.list.d/nvidia-jetson.list && \
-    echo "deb https://repo.download.nvidia.com/jetson/t234 r35.2 main" >> /etc/apt/sources.list.d/nvidia-jetson.list
-
-# copy prebuilt python venv with OpenCV + deps and custom GStreamer 1.24.9
-COPY --from=builder /opt/venv /opt/venv
-
-# copy custom built GStreamer 1.24.9 from system locations
+# Copy built libraries from builder stage
 COPY --from=builder /usr/lib/aarch64-linux-gnu/libgst* /usr/lib/aarch64-linux-gnu/
 COPY --from=builder /usr/lib/aarch64-linux-gnu/gstreamer-1.0/ /usr/lib/aarch64-linux-gnu/gstreamer-1.0/
 COPY --from=builder /usr/lib/aarch64-linux-gnu/pkgconfig/gstreamer* /usr/lib/aarch64-linux-gnu/pkgconfig/
 COPY --from=builder /usr/lib/aarch64-linux-gnu/girepository-1.0/Gst* /usr/lib/aarch64-linux-gnu/girepository-1.0/
 COPY --from=builder /usr/bin/gst-* /usr/bin/
 COPY --from=builder /usr/include/gstreamer-1.0/ /usr/include/gstreamer-1.0/
-
-# copy OpenCV shared libraries from builder stage
 COPY --from=builder /usr/local/lib/libopencv* /usr/local/lib/
+COPY --from=builder /usr/local/lib/python3.8/site-packages/cv2/ /usr/local/lib/python3.8/site-packages/cv2/
 
-# update library cache and prebuild GStreamer registry
+# Update library cache
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && \
     echo "/usr/lib/aarch64-linux-gnu" > /etc/ld.so.conf.d/gstreamer.conf && \
-    ldconfig && \
-    export GST_REGISTRY_UPDATE=no && \
-    export GST_DEBUG=0 && \
-    timeout 30s gst-inspect-1.0 --print-all >/dev/null 2>&1 || true
+    ldconfig
 
-# Create ROS2 workspace
+# Set up ROS2 environment
+ENV ROS_DISTRO=humble
+ENV ROS_VERSION=2
+ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+ENV PYTHONPATH="/usr/local/lib/python3.8/site-packages:${PYTHONPATH}"
+
+# Create workspace
 RUN mkdir -p /workspace/src
 WORKDIR /workspace
 
-# install nvidia tensorflow in final image
-RUN pip install --no-cache-dir --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v51 tensorflow==2.11.0+nv23.1 && \
-    pip install --no-cache-dir click PyGObject
-
-# Create startup script that sources ROS2
+# Create entrypoint script
 RUN echo '#!/bin/bash\n\
 set -e\n\
-if [ -f /opt/ros2_jazzy/install/setup.bash ]; then\n\
-  source /opt/ros2_jazzy/install/setup.bash\n\
+\n\
+# Source ROS2 environment\n\
+if [ -f /opt/ros/humble/setup.bash ]; then\n\
+  source /opt/ros/humble/setup.bash\n\
+  echo "ROS2 Humble environment sourced"\n\
 fi\n\
+\n\
+# Source local workspace if it exists\n\
 if [ -f /workspace/install/setup.bash ]; then\n\
   source /workspace/install/setup.bash\n\
+  echo "Local workspace sourced"\n\
 fi\n\
+\n\
+# Print environment info for debugging\n\
+if [ "$1" = "bash" ] || [ "$1" = "/bin/bash" ]; then\n\
+  echo "=== Environment Info ==="\n\
+  echo "PyTorch: $(python3 -c \"import torch; print(torch.__version__)\" 2>/dev/null || echo \"NOT FOUND\")"\n\
+  echo "OpenCV: $(python3 -c \"import cv2; print(cv2.__version__)\" 2>/dev/null || echo \"NOT FOUND\")"\n\
+  echo "ROS2: $ROS_DISTRO"\n\
+  echo "GStreamer: $(gst-launch-1.0 --version 2>/dev/null | head -n1 || echo \"NOT FOUND\")"\n\
+  echo "ros2 command: $(which ros2 2>/dev/null || echo \"NOT FOUND\")"\n\
+  echo "========================"\n\
+fi\n\
+\n\
 exec "$@"' > /ros_entrypoint.sh && \
     chmod +x /ros_entrypoint.sh
 
-# Copy test script
-COPY ./ros2_test.py /test/ros2_test.py
-
+ENV DEBIAN_FRONTEND=
 ENTRYPOINT ["/ros_entrypoint.sh"]
 CMD ["bash"]
