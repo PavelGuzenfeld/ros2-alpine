@@ -9,6 +9,8 @@ sudo docker run \
   --network host \
   --privileged \
   -v /tmp/.X11-unix:/tmp/.X11-unix \
+  -v /usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu \
+  -v /usr/local/cuda:/usr/local/cuda \
   -e NVIDIA_VISIBLE_DEVICES=all \
   -e NVIDIA_DRIVER_CAPABILITIES=compute,utility \
   -e NVIDIA_REQUIRE_CUDA="cuda>=11.4" \
