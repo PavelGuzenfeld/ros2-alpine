@@ -197,8 +197,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gir1.2-gstreamer-1.0 \
     # OpenCV runtime deps
     libjpeg8 \
-    libpng16-16 && \
-    rm -rf /var/lib/apt/lists/*y --no-install-recommends \
+    libpng16-16 \
     ca-certificates \
     wget \
     gnupg \
