@@ -1,4 +1,4 @@
-# Jetson Xavier TensorFlow + OpenCV + ROS2 Jazzy (Base Level Only - Fast-DDS)
+# Jetson Xavier TensorFlow 2.11.0 + GStreamer 1.24.9 + OpenCV 4.12 + ROS2 Jazzy
 FROM nvcr.io/nvidia/l4t-base:r35.2.1 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -462,8 +462,44 @@ RUN echo "=== Stage 5: Building RMW FastRTPS packages with diagnostics ===" && \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCMAKE_FIND_DEBUG_MODE=ON \
     --event-handlers console_direct+ || (echo "RMW FastRTPS BUILD FAILED - continuing..." && true)
 
-# Stage 6: Build everything else, excluding broken RMW packages if needed
-RUN echo "=== Stage 6: Building All Remaining Packages ===" && \
+# Stage 6: Build essential ROS2 packages for CLI functionality
+RUN echo "=== Stage 6: Building Essential ROS2 CLI and Python Packages ===" && \
+    source install/setup.bash && \
+    echo "=== Building RCL and core packages ===" && \
+    colcon build --symlink-install \
+    --packages-up-to \
+        builtin_interfaces \
+        unique_identifier_msgs \
+        rcl_interfaces \
+        common_interfaces \
+        rcl \
+        rcl_logging_interface \
+        rcl_logging_spdlog \
+        rcpputils \
+        rclcpp \
+        rclpy \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+    --event-handlers console_direct+ && \
+    echo "=== Building ROS2 CLI tools ===" && \
+    colcon build --symlink-install \
+    --packages-up-to \
+        ros2cli \
+        ros2cli_common_extensions \
+        ros2node \
+        ros2topic \
+        ros2service \
+        ros2param \
+        ros2action \
+        ros2pkg \
+        ros2interface \
+        ros2doctor \
+        ros2run \
+        ros2launch \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+    --event-handlers console_direct+ || (echo "CLI BUILD FAILED - continuing with available packages" && true)
+
+# Stage 7: Build remaining packages, excluding problematic ones
+RUN echo "=== Stage 7: Building Remaining Packages ===" && \
     source install/setup.bash && \
     colcon build --symlink-install \
     --packages-skip \
@@ -494,6 +530,8 @@ RUN echo "=== Stage 6: Building All Remaining Packages ===" && \
         pendulum_msgs \
         topic_monitor \
         composition \
+        rmw_fastrtps_cpp \
+        rmw_fastrtps_dynamic_cpp \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     --event-handlers console_direct+ || (echo "FINAL BUILD COMPLETED WITH SOME FAILURES" && true)
 
