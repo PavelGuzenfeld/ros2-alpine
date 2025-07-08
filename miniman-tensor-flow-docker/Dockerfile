@@ -304,12 +304,12 @@ ENV LD_LIBRARY_PATH="/opt/ros/humble/install/lib:${LD_LIBRARY_PATH}"
 RUN mkdir -p /workspace/
 WORKDIR /workspace
 
-# Create entrypoint script using printf (more reliable than heredoc in Dockerfile)
-RUN printf '#!/bin/bash\nset -e\n\n# Source ROS2 environment\nif [ -f /opt/ros/humble/setup.bash ]; then\n  source /opt/ros/humble/setup.bash\n  echo "ROS2 Humble environment sourced"\nfi\n\n# Source local workspace if it exists\nif [ -f /workspace/install/setup.bash ]; then\n  source /workspace/install/setup.bash\n  echo "Local workspace sourced"\nfi\n\n# Print environment info for debugging\nif [ "$1" = "bash" ] || [ "$1" = "/bin/bash" ]; then\n  echo "=== Environment Info ==="\n  \n  # PyTorch version\n  PYTORCH_VER=$(python3 -c "import torch; print(torch.__version__)" 2>/dev/null || echo "NOT FOUND")\n  echo "PyTorch: $PYTORCH_VER"\n  \n  # OpenCV version\n  OPENCV_VER=$(python3 -c "import cv2; print(cv2.__version__)" 2>/dev/null || echo "NOT FOUND")\n  echo "OpenCV: $OPENCV_VER"\n  \n  # ROS2 distro\n  echo "ROS2: $ROS_DISTRO"\n  \n  # GStreamer version (with timeout)\n  GST_VER=$(timeout 3 gst-inspect-1.0 --version 2>/dev/null | head -n1 || echo "NOT FOUND")\n  echo "GStreamer: $GST_VER"\n  \n  # ROS2 command\n  ROS2_CMD=$(which ros2 2>/dev/null || echo "NOT FOUND")\n  echo "ros2 command: $ROS2_CMD"\n  \n  echo "========================"\nfi\n\nexec "$@"\n' > /ros_entrypoint.sh && \
+# Create simple entrypoint script that just sources ROS2 and executes
+RUN printf '#!/bin/bash\nset -e\n\n# Source ROS2 environment\nif [ -f /opt/ros/humble/install/setup.bash ]; then\n  source /opt/ros/humble/install/setup.bash\nfi\n\n# Source local workspace if it exists\nif [ -f /workspace/install/setup.bash ]; then\n  source /workspace/install/setup.bash\nfi\n\nexec "$@"\n' > /ros_entrypoint.sh && \
     chmod +x /ros_entrypoint.sh
 
-# Create test directory for external test scripts
-RUN mkdir -p /test
+# Copy test script
+COPY test_jetson.py /test/test_jetson.py
 
 ENV DEBIAN_FRONTEND=
 ENTRYPOINT ["/ros_entrypoint.sh"]
