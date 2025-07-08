@@ -292,14 +292,47 @@ RUN wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cm
     tar -zxvf /tmp/cmake.tar.gz -C /usr/local --strip-components=1 && \
     rm /tmp/cmake.tar.gz
 
-# Install minimal system build dependencies
+
+# Install minimal system build dependencies and build LTTng from source
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libtinyxml2-dev \
     libssl-dev \
     libyaml-cpp-dev \
     libacl1-dev \
+    uuid-dev \
+    libpopt-dev \
+    libxml2-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Build and install LTTng from source
+RUN mkdir -p /tmp/lttng && cd /tmp/lttng && \
+    # Always build userspace-rcu from source (system version is too old)
+    wget https://lttng.org/files/urcu/userspace-rcu-0.14.0.tar.bz2 && \
+    tar -xjf userspace-rcu-0.14.0.tar.bz2 && \
+    cd userspace-rcu-0.14.0 && \
+    ./configure --prefix=/usr && \
+    make -j$(nproc) && \
+    make install && \
+    ldconfig && \
+    cd .. && \
+    # Build LTTng-UST (disable NUMA support to avoid libnuma dependency)
+    wget https://lttng.org/files/lttng-ust/lttng-ust-2.13.6.tar.bz2 && \
+    tar -xjf lttng-ust-2.13.6.tar.bz2 && \
+    cd lttng-ust-2.13.6 && \
+    ./configure --prefix=/usr --disable-numa && \
+    make -j$(nproc) && \
+    make install && \
+    ldconfig && \
+    cd .. && \
+    # Build LTTng-Tools
+    wget https://lttng.org/files/lttng-tools/lttng-tools-2.13.11.tar.bz2 && \
+    tar -xjf lttng-tools-2.13.11.tar.bz2 && \
+    cd lttng-tools-2.13.11 && \
+    ./configure --prefix=/usr && \
+    make -j$(nproc) && \
+    make install && \
+    ldconfig && \
+    cd / && rm -rf /tmp/lttng
 # Install Python build dependencies
 RUN pip3 install --no-cache-dir --upgrade setuptools==58.2.0 \
     colcon-common-extensions \
@@ -347,14 +380,36 @@ RUN rosdep init || echo "rosdep already initialized" && \
 # Set the default shell to bash for all subsequent RUN commands
 SHELL ["/bin/bash", "-c"]
 
-# Perform a single, robust build of the entire workspace.
-# This allows colcon to correctly resolve the full dependency tree.
-RUN echo "=== Building All ROS2 Packages ===" && \
+# Stage 1: Build the true foundation, including ament_lint and all vendor packages.
+RUN echo "=== Stage 1: Building Foundation ===" && \
     colcon build --symlink-install \
-    --cmake-args \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_TESTING=OFF \
-    --event-handlers console_direct+ || (echo "FINAL BUILD FAILED BUT WILL ATTEMPT TO CONTINUE" && sleep 1)
+    --packages-up-to \
+        ament_lint \
+        ament_index_python \
+        fastcdr \
+        foonathan_memory_vendor \
+        libyaml_vendor \
+        pybind11_vendor \
+        spdlog_vendor \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+    --event-handlers console_direct+ || (echo "FOUNDATION BUILD FAILED" && exit 1)
+
+# Stage 2: Build the entire ROSIDL system.
+RUN echo "=== Stage 2: Building ROSIDL packages ===" && \
+    source install/setup.bash && \
+    colcon build --symlink-install \
+    --packages-up-to \
+        rosidl_generator_py \
+        rosidl_dynamic_typesupport \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+    --event-handlers console_direct+ || (echo "ROSIDL BUILD FAILED" && exit 1)
+
+# Stage 3: Build the rest of the packages now that the foundation and generators are complete.
+RUN echo "=== Stage 3: Building All Remaining Packages ===" && \
+    source install/setup.bash && \
+    colcon build --symlink-install \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+    --event-handlers console_direct+ || (echo "FINAL BUILD FAILED" && exit 1)
 
 
 # Set up ROS2 environment
