@@ -155,7 +155,7 @@ RUN mkdir -p /tmp/opencv && cd /tmp/opencv && \
 # This is the most reliable approach for getting Humble on r35.2.1
 FROM dustynv/ros:humble-ros-base-l4t-r35.2.1 AS ros2_source
 
-# Use the main build for final stage
+# Final Stage: PyTorch 2.0+ + OpenCV 4.8.1 + ROS2 Humble + GStreamer 1.24.9
 FROM dustynv/l4t-pytorch:r35.2.1
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -169,6 +169,45 @@ ENV LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libGLdispatch.so"
 
 # Install runtime dependencies and ROS2 Humble base
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    gnupg \
+    curl \
+    lsb-release \
+    # CUDA runtime libraries for PyTorch
+    cuda-runtime-11-4 \
+    libcublas11 \
+    libcublaslt11 \
+    libcufft10 \
+    libcurand10 \
+    libcusolver11 \
+    libcusparse11 \
+    libnpp11 \
+    # GStreamer runtime deps
+    libglib2.0-0 \
+    libcairo2 \
+    libgirepository-1.0-1 \
+    libavcodec58 \
+    libavformat58 \
+    libavutil56 \
+    libswscale5 \
+    liborc-0.4-0 \
+    libxml2 \
+    libpopt0 \
+    libffi7 \
+    libpcre2-8-0 \
+    zlib1g \
+    libssl1.1 \
+    libv4l-0 \
+    v4l-utils \
+    python3-gi \
+    python3-gi-cairo \
+    gir1.2-glib-2.0 \
+    gir1.2-gstreamer-1.0 \
+    # OpenCV runtime deps
+    libjpeg8 \
+    libpng16-16 && \
+    rm -rf /var/lib/apt/lists/*y --no-install-recommends \
     ca-certificates \
     wget \
     gnupg \
@@ -294,7 +333,7 @@ RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && \
 ENV ROS_DISTRO=humble
 ENV ROS_VERSION=2
 ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-ENV PYTHONPATH="/usr/local/lib/python3.8/site-packages:${PYTHONPATH}"
+ENV PYTHONPATH="/usr/local/lib/python3.8/site-packages:/opt/ros/humble/install/local/lib/python3.8/site-packages:/opt/ros/humble/install/lib/python3.8/site-packages:${PYTHONPATH}"
 ENV AMENT_PREFIX_PATH="/opt/ros/humble/install"
 ENV CMAKE_PREFIX_PATH="/opt/ros/humble/install"
 ENV PATH="/opt/ros/humble/install/bin:${PATH}"
