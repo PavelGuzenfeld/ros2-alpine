@@ -300,6 +300,8 @@ RUN rosdep init || echo "rosdep already initialized" && \
 RUN wget -q https://developer.download.nvidia.cn/compute/redist/jp/v512/pytorch/torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
     pip3 install torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
     rm torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
+
 
 # Install additional Python dependencies
 RUN pip3 install --no-cache-dir click PyGObject
