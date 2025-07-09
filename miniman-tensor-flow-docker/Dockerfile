@@ -23,7 +23,8 @@ RUN pip3 install --no-cache-dir \
     lark \
     empy \
     numpy \
-    rosinstall_generator
+    rosinstall_generator \
+    rosdistro
 
 # Install Meson for GStreamer build
 RUN pip3 install meson==1.2.0
@@ -60,7 +61,7 @@ RUN mkdir -p /ros2_ws/src && cd /ros2_ws && \
     vcs import src < humble-ros-base.repos
 
 RUN cd /ros2_ws && rosdep install --from-paths src --ignore-src -y --rosdistro humble \
-    --skip-keys "fastcdr fastrtps rti-connext-dds-6.0.1 urdfdom_headers python3-lark python3-vcstool python3-colcon-common-extensions python3-catkin-pkg python3-catkin-pkg-modules python3-rosdep python3-empy python3-numpy"
+    --skip-keys "fastcdr fastrtps rti-connext-dds-6.0.1 urdfdom_headers python3-lark python3-vcstool python3-colcon-common-extensions python3-catkin-pkg python3-catkin-pkg-modules python3-rosdep python3-empy python3-numpy python3-rosdistro-modules"
 
 RUN cd /ros2_ws && colcon build --symlink-install --mixin release
 
@@ -85,14 +86,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 libcairo2 libgirepository-1.0-1 libavcodec58 libavformat58 \
     libavutil56 libswscale5 liborc-0.4-0 libxml2 libpopt0 libffi7 libpcre2-8-0 \
     libssl1.1 libv4l-0 v4l-utils libjpeg8 libpng16-16 \
-    python3-lark python3-empy python3-catkin-pkg && \
+    python3-lark python3-empy python3-catkin-pkg python3-rosdistro && \
     rm -rf /var/lib/apt/lists/*
 
 # Install PyTorch
 RUN wget -q https://developer.download.nvidia.cn/compute/redist/jp/v512/pytorch/torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
     pip3 install torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
     rm torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl
-
 
 # 2. Copy all compiled artifacts from the builder stage
 COPY --from=builder /ros2_ws/install/ /opt/ros/humble/
@@ -112,9 +112,6 @@ RUN pip3 install --no-cache-dir click PyGObject
 # Copy built libraries from builder stage
 COPY --from=builder /usr/lib/aarch64-linux-gnu/libgst* /usr/lib/aarch64-linux-gnu/
 COPY --from=builder /usr/lib/aarch64-linux-gnu/gstreamer-1.0/ /usr/lib/aarch64-linux-gnu/gstreamer-1.0/
-COPY --from=builder /usr/lib/aarch64-linux-gnu/pkgconfig/gstreamer* /usr/lib/aarch64-linux-gnu/pkgconfig/
-COPY --from=builder /usr/lib/aarch64-linux-gnu/girepository-1.0/Gst* /usr/lib/aarch64-linux-gnu/girepository-1.0/
-COPY --from=builder /usr/bin/gst-* /usr/bin/
 COPY --from=builder /usr/include/gstreamer-1.0/ /usr/include/gstreamer-1.0/
 COPY --from=builder /usr/local/lib/libopencv* /usr/local/lib/
 COPY --from=builder /usr/local/lib/python3.8/site-packages/cv2/ /usr/local/lib/python3.8/site-packages/cv2/
