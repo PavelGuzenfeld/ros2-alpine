@@ -56,13 +56,11 @@ RUN rosdep init || echo "rosdep already initialized" && \
     rosdep fix-permissions
 
 RUN mkdir -p /ros2_ws/src && cd /ros2_ws && \
-    # MODIFIED: Use rosinstall_generator to get only ros-base sources
     rosinstall_generator ros_base --rosdistro humble --deps --tar > humble-ros-base.repos && \
     vcs import src < humble-ros-base.repos
 
-# Expanded --skip-keys to prevent rosdep from trying to apt-install Python packages
 RUN cd /ros2_ws && rosdep install --from-paths src --ignore-src -y --rosdistro humble \
-    --skip-keys "fastcdr fastrtps rti-connext-dds-6.0.1 urdfdom_headers python3-lark python3-vcstool python3-colcon-common-extensions python3-catkin-pkg python3-rosdep python3-empy python3-numpy"
+    --skip-keys "fastcdr fastrtps rti-connext-dds-6.0.1 urdfdom_headers python3-lark python3-vcstool python3-colcon-common-extensions python3-catkin-pkg python3-catkin-pkg-modules python3-rosdep python3-empy python3-numpy"
 
 RUN cd /ros2_ws && colcon build --symlink-install --mixin release
 
