@@ -4,7 +4,7 @@ FROM dustynv/l4t-pytorch:r35.2.1 AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
 # 1. Install base build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update --allow-insecure-repositories && apt-get install -y --no-install-recommends \
     build-essential git cmake ninja-build wget ca-certificates python3-dev pkg-config \
     flex bison libglib2.0-dev libcairo2-dev libgirepository1.0-dev libavcodec-dev \
     libavformat-dev libavutil-dev libswscale-dev liborc-0.4-dev libxml2-dev \
@@ -49,8 +49,7 @@ RUN mkdir -p /tmp/opencv && cd /tmp/opencv && \
     cmake --build build -j"$(nproc)" && cmake --install build && rm -rf /tmp/opencv
 
 # 4. Build ROS2 Humble from source (ros-base variant only)
-# Enable the 'universe' repository to find libgtest-dev
-RUN add-apt-repository universe && apt-get update
+RUN add-apt-repository universe && apt-get update --allow-insecure-repositories
 
 RUN rosdep init || echo "rosdep already initialized" && \
     rosdep update && \
@@ -81,7 +80,7 @@ ENV GST_PLUGIN_PATH="/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/workspace/install
 ENV PYTHONPATH="/usr/lib/python3/site-packages"
 ENV LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libGLdispatch.so"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update --allow-insecure-repositories && apt-get install -y --no-install-recommends \
     python3-pip python3-yaml python3-setuptools python3-gi python3-gi-cairo \
     libglib2.0-0 libcairo2 libgirepository-1.0-1 libavcodec58 libavformat58 \
     libavutil56 libswscale5 liborc-0.4-0 libxml2 libpopt0 libffi7 libpcre2-8-0 \
