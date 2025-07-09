@@ -21,7 +21,7 @@ RUN pip3 install --no-cache-dir \
     colcon-common-extensions \
     catkin_pkg \
     lark \
-    empy \
+    empy==3.3.4 \
     numpy \
     rosinstall_generator \
     rosdistro
@@ -84,13 +84,15 @@ RUN apt-get update --allow-insecure-repositories && apt-get install -y --no-inst
     python3-pip python3-yaml python3-setuptools python3-gi python3-gi-cairo \
     libglib2.0-0 libcairo2 libgirepository-1.0-1 libavcodec58 libavformat58 \
     libavutil56 libswscale5 liborc-0.4-0 libxml2 libpopt0 libffi7 libpcre2-8-0 \
-    libssl1.1 libv4l-0 v4l-utils libjpeg8 libpng16-16 \
-    python3-lark python3-empy python3-catkin-pkg python3-rosdistro && \
+    libssl1.1 libv4l-0 v4l-utils libjpeg8 libpng16-16 && \
     rm -rf /var/lib/apt/lists/*
+
+# Install runtime python packages including the pinned empy version
+RUN pip3 install --no-cache-dir lark empy==3.3.4 catkin_pkg rosdistro
 
 # Install PyTorch
 RUN wget -q https://developer.download.nvidia.cn/compute/redist/jp/v512/pytorch/torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
-    pip3 install torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
+    pip3 install --no-cache-dir torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl && \
     rm torch-2.1.0a0+41361538.nv23.06-cp38-cp38-linux_aarch64.whl
 
 # 2. Copy all compiled artifacts from the builder stage
