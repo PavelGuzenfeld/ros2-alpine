@@ -82,8 +82,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     locales python3-gi python3-gi-cairo libglib2.0-0 libcairo2 libgirepository-1.0-1 \
     libavcodec58 libavformat58 libavutil56 libswscale5 liborc-0.4-0 libxml2 libpopt0 \
     libffi7 libpcre2-8-0 libssl1.1 libv4l-0 v4l-utils libjpeg8 libpng16-16 libspdlog1 \
-    build-essential cmake git python3-colcon-common-extensions python3-rosdep \
-    python3-rosinstall-generator python3-vcstool python3-setuptools python3-numpy \
+    build-essential cmake git python3-rosdep libacl1-dev \
+    python3-rosinstall-generator python3-setuptools python3-numpy \
     python3-pip python3-dev libasio-dev libtinyxml2-dev libcunit1-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -91,7 +91,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN locale-gen en_US en_US.UTF-8 && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
 
 # 3. python tools
-RUN pip3 install --index-url https://pypi.org/simple --no-cache-dir lark empy==3.3.4 catkin_pkg rosdistro click PyGObject scikit-build && \
+RUN pip3 install --index-url https://pypi.org/simple --no-cache-dir lark empy==3.3.4 colcon-common-extensions vcstool catkin_pkg rosdistro click PyGObject scikit-build && \
     pip3 install --index-url https://pypi.org/simple --upgrade cmake
 
 # 4. copy gstreamer/opencv from builder
@@ -105,20 +105,68 @@ COPY --from=builder /usr/local/lib/python3.8/site-packages/cv2/ /usr/local/lib/p
 # 5. build ROS2 HUMBLE FROM SOURCE (last step)
 # ==========================================
 WORKDIR /tmp
+# 1. generate rosinstall file
 RUN mkdir -p ${ROS_ROOT}/src && cd ${ROS_ROOT} && \
     rosinstall_generator --deps --rosdistro ${ROS_DISTRO} ros_base \
         launch_xml launch_yaml launch_testing launch_testing_ament_cmake \
-        demo_nodes_cpp demo_nodes_py example_interfaces camera_calibration_parsers \
-        camera_info_manager cv_bridge v4l2_camera vision_opencv vision_msgs image_geometry \
+        demo_nodes_cpp example_interfaces camera_calibration_parsers \
+        vision_msgs image_geometry \
         image_pipeline image_transport compressed_image_transport compressed_depth_image_transport \
-        > ros2.${ROS_DISTRO}.rosinstall && \
-    vcs import src < ros2.${ROS_DISTRO}.rosinstall && \
-    rm -r ${ROS_ROOT}/src/ament_cmake && git -C ${ROS_ROOT}/src/ clone https://github.com/ament/ament_cmake -b ${ROS_DISTRO} && \
-    rosdep init || true && rosdep update && \
-    rosdep install -y --ignore-src --from-paths src --rosdistro ${ROS_DISTRO} \
-        --skip-keys "libopencv-dev libopencv-contrib-dev libopencv-imgproc-dev python-opencv python3-opencv" && \
-    colcon build --merge-install --cmake-args -DCMAKE_BUILD_TYPE=Release && \
-    rm -rf ${ROS_ROOT}/src ${ROS_ROOT}/logs ${ROS_ROOT}/build *.rosinstall
+        > ros2.${ROS_DISTRO}.rosinstall
+
+# 2. import repos
+RUN cd ${ROS_ROOT} && vcs import src < ros2.${ROS_DISTRO}.rosinstall
+# remove useless vendor packages causing cmake <3.5 failures
+# nuke all useless vendor junk before build
+RUN rm -rf ${ROS_ROOT}/src/osrf_testing_tools_cpp \
+           ${ROS_ROOT}/src/iceoryx \
+           ${ROS_ROOT}/src/uncrustify_vendor \
+           ${ROS_ROOT}/src/google_benchmark_vendor \
+           ${ROS_ROOT}/src/zstd_vendor \
+           ${ROS_ROOT}/src/fastrtps \
+           ${ROS_ROOT}/src/mimick_vendor
+
+
+
+# 3. fix ament_cmake (remove and re‑clone cleanly)
+RUN rm -rf ${ROS_ROOT}/src/ament_cmake && \
+    git -C ${ROS_ROOT}/src/ clone https://github.com/ament/ament_cmake -b ${ROS_DISTRO}
+
+# 4. init rosdep and update
+RUN rosdep init || true && rosdep update
+
+# 5. install dependencies (skip garbage packages jetson doesn’t have)
+# RUN cd ${ROS_ROOT} && \
+#     rosdep install -y --ignore-src --from-paths src --rosdistro ${ROS_DISTRO} \
+#         --skip-keys "libopencv-dev libopencv-contrib-dev libopencv-imgproc-dev \
+#         python-opencv python3-opencv \
+#         libxml2-utils python3-pytest python3-pytest-timeout pydocstyle python3-importlib-metadata \
+#         python3-argcomplete python3-flake8 libeigen3-dev python3-lxml libzstd-dev libssl-dev libconsole-bridge-dev \
+#         libyaml-dev libboost-dev python3-mypy python3-empy uncrustify libspdlog-dev clang-format libeigen3-dev python3-catkin-pkg-modules \
+#         libtinyxml-dev python3-cryptography libeigen3-dev python3-pykdl libsqlite3-dev libbenchmark-dev python3-pytest-mock \
+#         cppcheck graphviz acl libyaml-cpp-dev libeigen3-dev libspdlog-dev python3-pycodestyle pybind11-dev libeigen3-dev \
+#         libboost-python-dev libeigen3-dev python3-lark libbullet-dev rti-connext-dds-6.0.1 libboost-python1.71.0 libyaml-dev \
+#         libeigen3-dev python3-psutil python3-lark libbenchmark-dev libtinyxml-dev libbullet-dev python3-rosdistro-modules \
+#         python3-netifaces libspdlog-dev libbenchmark-dev libbullet-dev python3-packaging libtinyxml-dev"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libxml2-utils python3-argcomplete python3-flake8 libeigen3-dev \
+    python3-lxml libzstd-dev libconsole-bridge-dev libyaml-dev \
+    libboost-dev python3-mypy python3-empy uncrustify libspdlog-dev \
+    clang-format libtinyxml-dev \
+    python3-cryptography python3-pykdl libsqlite3-dev libbenchmark-dev \
+    python3-pytest python3-pytest-mock python3-pytest-timeout pydocstyle cppcheck graphviz acl libyaml-cpp-dev \
+    pybind11-dev libboost-python-dev python3-psutil python3-packaging \
+    libbullet-dev python3-lark python3-netifaces \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --upgrade --no-cache-dir cmake scikit-build ninja
+ENV CMAKE_ARGS="-DBUILD_IDLC=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+RUN cd ${ROS_ROOT} && colcon build --merge-install \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_IDLC=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+# 7. cleanup build artifacts
+RUN rm -rf ${ROS_ROOT}/src ${ROS_ROOT}/logs ${ROS_ROOT}/build *.rosinstall
+
 
 # ==========================================
 # env + entrypoint
