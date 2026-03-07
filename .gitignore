@@ -1,82 +1,27 @@
-# ROS 2 Alpine Build - Git Ignore Rules
-
-# Build artifacts and temporary files
+# Build artifacts
 *.log
-*.tmp
-.build/
+*.bak
 build/
 install/
 log/
 
-# Docker build cache and images
-.dockerignore
+# Docker
 *.tar
 *.tar.gz
 
-# Editor and IDE files
+# Editor/IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
 *.so
-.Python
-env/
-venv/
-.env
-.venv
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Test results and coverage
-.coverage
-.pytest_cache/
-htmlcov/
-.tox/
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-
-# Local configuration
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Backup files
-*.bak
-*.backup
-*.old
-
-# Workspace specific
-workspace/
-ws/
-ros2_ws/
-
-# Documentation build
-docs/_build/
-site/
-
-# Local development
-local/
-scratch/
-experiments/
+.venv/
