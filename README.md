@@ -22,7 +22,7 @@ docker run -it ghcr.io/pavelguzenfeld/ros2-alpine:latest
 
 ```bash
 # Specific version
-docker pull ghcr.io/pavelguzenfeld/ros2-alpine:1.0.0
+docker pull ghcr.io/pavelguzenfeld/ros2-alpine:0.1.0
 
 # Latest
 docker pull ghcr.io/pavelguzenfeld/ros2-alpine:latest
@@ -145,8 +145,8 @@ Without these, images are published to GHCR only.
 ### Creating a Release
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 ## License
