@@ -1,205 +1,121 @@
-# ROS 2 Jazzy Alpine Build
+# ROS 2 Jazzy on Alpine Linux
 
-A production-ready build system for creating minimal ROS 2 Jazzy containers on Alpine Linux from source.
+Minimal, production-ready Docker image for ROS 2 Jazzy built from source on Alpine Linux.
+Final image size is ~200MB compared to ~2GB for Ubuntu-based ROS 2 images.
 
-## 📁 Project Structure
+## Quick Start
 
-```
-ros2-alpine-build/
-├── Dockerfile.ros2-jazzy-alpine     # 🐳 Multi-stage ROS 2 build definition
-├── build.sh                         # 🔨 Docker build orchestration
-├── test.sh                          # 🧪 Comprehensive test suite
-├── pipeline.sh                      # 🚀 Main build pipeline (ENTRY POINT)
-├── README.md                        # 📖 Project documentation
-└── .gitignore                       # 🚫 Git exclusion rules
-```
+### Pull from GHCR
 
-## 🎯 File Responsibilities
-
-| File | Purpose | Can Run Standalone |
-|------|---------|-------------------|
-| **`pipeline.sh`** | **Main entry point** - orchestrates build & test | ✅ **Recommended** |
-| `build.sh` | Docker build execution and image management | ✅ |
-| `test.sh` | Container functionality testing and validation | ✅ (requires image) |
-| `Dockerfile.ros2-jazzy-alpine` | Multi-stage container build definition | ✅ (via Docker) |
-
-## 🚀 Quick Start
-
-### Option 1: Complete Pipeline (Recommended)
 ```bash
-# Make scripts executable
-chmod +x *.sh
-
-# Run complete build and test pipeline
-./pipeline.sh
+docker pull ghcr.io/pavelguzenfeld/ros2-alpine:latest
+docker run -it ghcr.io/pavelguzenfeld/ros2-alpine:latest
 ```
 
-### Option 2: Step-by-Step
-```bash
-# Build only
-./build.sh
-
-# Test only (after build)
-./test.sh
-```
-
-## 📋 Pipeline Options
+### Build Locally
 
 ```bash
 # Full pipeline (build + test)
 ./pipeline.sh
 
 # Build only
-./pipeline.sh --build-only
+./build.sh
 
 # Test existing image
-./pipeline.sh --test-only
-
-# Build without testing
-./pipeline.sh --skip-tests
-
-# Clean cache and build
-./pipeline.sh --clean
-
-# Interactive testing
-./pipeline.sh --interactive
-
-# Show system info
-./pipeline.sh --info
-
-# Help
-./pipeline.sh --help
+./test.sh
 ```
 
-## 🧪 Test Suite
+## Pipeline Options
 
-The test suite includes 6 comprehensive tests:
-
-### Critical Tests (Must Pass)
-1. **Container Startup** - Basic container functionality
-2. **Python Imports** - ROS 2 Python packages (rclpy, ament_package)
-3. **Node Creation** - ROS 2 node lifecycle
-
-### Optional Tests (Nice to Have)
-4. **CLI Tools** - ros2 command availability
-5. **Environment Debug** - System information and paths
-6. **Message Types** - ROS 2 message creation
-
-## 🏗️ Build Process
-
-### Multi-Stage Docker Build
-1. **Builder Stage** (Alpine + Build Tools)
-   - Foundation packages (gtest, ament)
-   - External dependencies (Fast-DDS, Fast-CDR)
-   - Core ROS packages (rcutils, rmw, rclpy)
-   - Message interfaces and CLI tools
-
-2. **Runtime Stage** (Clean Alpine)
-   - Minimal runtime dependencies
-   - Built ROS 2 packages
-   - Environment configuration
-
-### Build Stages
-- **Stage 1-2**: Foundation and build system
-- **Stage 3-4**: External dependencies and middleware
-- **Stage 5-7**: Core ROS packages and Python bindings
-- **Stage 8-10**: Message interfaces and CLI tools
-
-## 📊 Specifications
-
-- **Base Image**: Alpine Linux (latest)
-- **ROS Distribution**: Jazzy (built from source)
-- **Middleware**: FastRTPS (rmw_fastrtps_cpp)
-- **Python Version**: 3.12
-- **Build System**: colcon
-- **Final Image Size**: ~200MB
-- **Build Time**: 1-3 hours (hardware dependent)
-
-## 🔧 System Requirements
-
-- **Docker**: 20.10+ (with BuildKit support)
-- **Memory**: 8GB+ recommended
-- **Disk Space**: 10GB+ available
-- **Network**: Internet connection for package downloads
-
-## 🐛 Troubleshooting
-
-### Build Issues
 ```bash
-# Check system resources
-./pipeline.sh --info
-
-# Clean build cache
-./pipeline.sh --clean
-
-# Build only (skip tests)
-./pipeline.sh --build-only
+./pipeline.sh                  # Build and test
+./pipeline.sh --build-only     # Build without testing
+./pipeline.sh --test-only      # Test existing image
+./pipeline.sh --clean          # Clean cache and rebuild
+./pipeline.sh --info           # Show system info
 ```
 
-### Test Issues
+## Image Details
+
+| Property | Value |
+|----------|-------|
+| Base | Alpine Linux 3.21 |
+| ROS Distribution | Jazzy (built from source) |
+| Middleware | FastRTPS (rmw_fastrtps_cpp) |
+| Python | 3.12 |
+| Final image size | ~200MB |
+| Build time | 1-3 hours |
+
+## What's Included
+
+- Core ROS 2 packages (rcl, rclpy, rosidl)
+- Standard message types (std_msgs, builtin_interfaces)
+- ROS 2 CLI tools (ros2 topic, ros2 node, etc.)
+- FastRTPS middleware
+- Python bindings (rclpy)
+- colcon build system
+
+## Usage
+
 ```bash
-# Run interactive tests
-./pipeline.sh --interactive
+# Run with host networking (for ROS 2 discovery)
+docker run -it --network host ghcr.io/pavelguzenfeld/ros2-alpine:latest
 
-# Test specific functionality
-./test.sh --interactive
+# Mount a workspace
+docker run -it -v $(pwd)/ws:/workspace ghcr.io/pavelguzenfeld/ros2-alpine:latest
 
-# Check container manually
-docker run -it ros2-jazzy-alpine:latest bash
-```
-
-### Common Problems
-
-1. **Out of Memory**: Increase Docker memory limit to 8GB+
-2. **Disk Space**: Ensure 10GB+ available disk space
-3. **Network Issues**: Check internet connection for git clones
-4. **Permission Issues**: Ensure scripts are executable (`chmod +x *.sh`)
-
-## 🚀 Usage Examples
-
-### Run Container
-```bash
-# Basic usage
-docker run -it ros2-jazzy-alpine:latest
-
-# With network access
-docker run -it --network host ros2-jazzy-alpine:latest
-
-# Mount workspace
-docker run -it -v $(pwd)/workspace:/workspace ros2-jazzy-alpine:latest
-```
-
-### Inside Container
-```bash
-# Source ROS environment
+# Inside the container
 source /opt/ros/jazzy/setup.bash
-
-# Check ROS installation
-ros2 pkg list | head -10
-
-# Create a simple node
 python3 -c "
 import rclpy
 from rclpy.node import Node
-
 rclpy.init()
-node = Node('test_node')
+node = Node('hello')
 node.get_logger().info('Hello from Alpine ROS 2!')
 rclpy.shutdown()
 "
 ```
 
-## 🤝 Contributing
+## Build Configuration
 
-1. Fork the repository
-2. Create feature branch
-3. Test your changes
-4. Submit pull request
+The Dockerfile supports build arguments for customization:
 
-## 📄 License
+```bash
+# Use more parallel jobs on a machine with more RAM
+docker build --build-arg PARALLEL_JOBS=4 -t ros2-jazzy-alpine .
 
-This project is open source. See individual package licenses for ROS 2 components.
+# Pin a specific Alpine version
+docker build --build-arg ALPINE_VERSION=3.21 -t ros2-jazzy-alpine .
+```
 
-## 🏷️ Tags
+## System Requirements
 
-`ros2` `alpine` `docker` `jazzy` `robotics` `minimal` `source-build`
+- Docker 20.10+ with BuildKit
+- 8GB+ RAM (for building from source)
+- 10GB+ disk space
+- Internet connection (for cloning ROS 2 sources)
+
+## Project Structure
+
+```
+ros2-alpine/
+├── Dockerfile           # Multi-stage build definition
+├── build.sh             # Docker build script
+├── test.sh              # Image validation tests
+├── pipeline.sh          # Build + test orchestration
+└── .github/
+    └── workflows/
+        └── build.yml    # CI: lint, build, test, publish to GHCR
+```
+
+## CI/CD
+
+GitHub Actions automatically:
+- **On push to main**: builds, tests, and publishes to GHCR
+- **On tags (v\*)**: publishes versioned releases
+- **Weekly**: rebuilds to pick up Alpine security updates
+- **On PRs**: runs linting (ShellCheck, Hadolint)
+
+## License
+
+MIT. ROS 2 components retain their original licenses (Apache 2.0).

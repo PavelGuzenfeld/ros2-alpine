@@ -1,76 +1,62 @@
 #!/bin/bash
+set -uo pipefail
 
-# Quick fix script for ROS 2 Alpine Pipeline
-# Fixes the file naming and compatibility issues
+IMAGE_NAME="${1:-${ROS2_IMAGE:-ros2-jazzy-alpine:latest}}"
 
-set -e
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
 
-echo "🔧 Fixing ROS 2 Alpine Pipeline Issues..."
-echo "========================================"
+PASS=0
+FAIL=0
 
-# Check if we're in the right directory
-if [ ! -f "pipline.sh" ] && [ ! -f "pipeline.sh" ]; then
-    echo "❌ Neither pipline.sh nor pipeline.sh found in current directory"
-    echo "   Please run this script from your ROS 2 Alpine project directory"
+run_test() {
+    local name="$1"
+    local cmd="$2"
+
+    if docker run --rm "$IMAGE_NAME" bash -c "$cmd" >/dev/null 2>&1; then
+        printf "  ${GREEN}PASS${NC}  %s\n" "$name"
+        PASS=$((PASS + 1))
+    else
+        printf "  ${RED}FAIL${NC}  %s\n" "$name"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+echo "Testing image: $IMAGE_NAME"
+echo ""
+
+run_test "Container startup" \
+    'source /opt/ros/jazzy/setup.bash'
+
+run_test "Python rclpy import" \
+    'source /opt/ros/jazzy/setup.bash && python3 -c "import rclpy"'
+
+run_test "Python std_msgs import" \
+    'source /opt/ros/jazzy/setup.bash && python3 -c "from std_msgs.msg import String"'
+
+run_test "Node lifecycle" \
+    'source /opt/ros/jazzy/setup.bash && timeout 5 python3 -c "
+import rclpy
+rclpy.init()
+node = rclpy.create_node(\"test\")
+node.get_logger().info(\"ok\")
+rclpy.shutdown()"'
+
+run_test "Message creation" \
+    'source /opt/ros/jazzy/setup.bash && python3 -c "
+from std_msgs.msg import String
+from builtin_interfaces.msg import Time
+msg = String(data=\"hello\")
+t = Time(sec=1, nanosec=0)"'
+
+run_test "ROS 2 CLI" \
+    'source /opt/ros/jazzy/setup.bash && ros2 --help'
+
+TOTAL=$((PASS + FAIL))
+echo ""
+echo "Results: $PASS/$TOTAL passed"
+
+if [ "$FAIL" -gt 0 ]; then
     exit 1
 fi
-
-# 1. Fix the typo in pipeline script name
-if [ -f "pipline.sh" ] && [ ! -f "pipeline.sh" ]; then
-    echo "📝 Renaming pipline.sh to pipeline.sh (fixing typo)"
-    mv pipline.sh pipeline.sh
-    echo "✅ Fixed pipeline script name"
-fi
-
-# 2. Update pipeline.sh to use correct Dockerfile name
-if [ -f "pipeline.sh" ]; then
-    echo "📝 Updating pipeline.sh to use Dockerfile.ros2-core"
-    sed -i.bak 's/Dockerfile\.ros2-jazzy-alpine/Dockerfile.ros2-core/g' pipeline.sh
-    echo "✅ Updated Dockerfile reference in pipeline.sh"
-fi
-
-# 3. Update test.sh to use correct image name
-if [ -f "test.sh" ]; then
-    echo "📝 Updating test.sh to use correct image tag"
-    sed -i.bak 's/ros2-jazzy-alpine:latest/ros2-jazzy-alpine:core/g' test.sh
-    echo "✅ Updated image name in test.sh"
-fi
-
-# 4. Make scripts executable
-echo "📝 Making scripts executable"
-chmod +x *.sh
-echo "✅ Scripts are now executable"
-
-# 5. Verify fixes
-echo ""
-echo "🔍 Verifying fixes..."
-
-# Check Dockerfile exists
-if [ -f "Dockerfile.ros2-core" ]; then
-    echo "✅ Dockerfile.ros2-core found"
-else
-    echo "❌ Dockerfile.ros2-core not found"
-fi
-
-# Check updated files
-if grep -q "Dockerfile.ros2-core" pipeline.sh 2>/dev/null; then
-    echo "✅ pipeline.sh uses correct Dockerfile name"
-else
-    echo "❌ pipeline.sh still has incorrect Dockerfile name"
-fi
-
-if grep -q "ros2-jazzy-alpine:core" test.sh 2>/dev/null; then
-    echo "✅ test.sh uses correct image tag"
-else
-    echo "❌ test.sh still has incorrect image tag"
-fi
-
-echo ""
-echo "🎉 Pipeline fixes completed!"
-echo ""
-echo "Now you can run:"
-echo "  ./pipeline.sh              # Full build and test"
-echo "  ./pipeline.sh --build-only # Build only"
-echo "  ./pipeline.sh --help       # Show all options"
-echo ""
-echo "Note: Backup files (.bak) were created for modified scripts"
