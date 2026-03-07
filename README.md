@@ -56,6 +56,7 @@ docker pull ghcr.io/pavelguzenfeld/ros2-alpine:latest
 | Property | Value |
 |----------|-------|
 | Base | Alpine Linux 3.21 |
+| Architectures | amd64, arm64 |
 | ROS Distribution | Jazzy (built from source) |
 | Middleware | FastRTPS (rmw_fastrtps_cpp) |
 | Python | 3.12 |
