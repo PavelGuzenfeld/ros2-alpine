@@ -167,7 +167,21 @@ RUN bash -c 'source install/setup.bash && \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+'
 
-# Build Stage 4: rpyutils (requires ament_mypy)
+# Build Stage 4: Fast-DDS middleware (heavy, separate layer for caching)
+RUN bash -c 'source install/setup.bash && \
+    colcon build \
+        --packages-up-to \
+            fastdds \
+        --cmake-args \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF \
+            -DBUILD_DOCUMENTATION=OFF \
+            -DCOMPILE_EXAMPLES=OFF \
+            -DCMAKE_C_FLAGS="${CFLAGS}" \
+            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
+        --event-handlers console_direct+'
+
+# Build Stage 5: rpyutils
 RUN bash -c 'source install/setup.bash && \
     colcon build \
         --packages-select \
@@ -181,7 +195,7 @@ RUN bash -c 'source install/setup.bash && \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+'
 
-# Build Stage 5: ROSIDL core (requires rpyutils)
+# Build Stage 6: ROSIDL core
 RUN bash -c 'source install/setup.bash && \
     colcon build \
         --packages-up-to \
@@ -198,7 +212,7 @@ RUN bash -c 'source install/setup.bash && \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+'
 
-# Build Stage 6: Core ROS packages
+# Build Stage 7: Core ROS packages
 RUN bash -c 'source install/setup.bash && \
     colcon build \
         --packages-up-to \
