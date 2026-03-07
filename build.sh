@@ -55,7 +55,10 @@ check_status() {
 }
 
 build() {
-    local cache_arg="${1:-}"
+    local -a build_args=()
+    if [ -n "${1:-}" ]; then
+        build_args+=("$1")
+    fi
 
     if [ ! -f "$DOCKERFILE" ]; then
         error "Dockerfile not found: $DOCKERFILE"
@@ -70,7 +73,7 @@ build() {
     start_time=$(date +%s)
 
     DOCKER_BUILDKIT=1 docker build \
-        ${cache_arg} \
+        "${build_args[@]+"${build_args[@]}"}" \
         -f "$DOCKERFILE" \
         -t "$IMAGE_NAME" \
         "$SCRIPT_DIR"

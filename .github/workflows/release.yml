@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PREV_TAG=$(git tag --sort=-v:refname | grep '^v' | sed -n '2p' || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            CHANGES=$(git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s" --no-merges)
+          else
+            CHANGES=$(git log --pretty=format:"- %s" --no-merges)
+          fi
+          {
+            echo "notes<<EOF"
+            echo "## Docker Images"
+            echo ""
+            echo "\`\`\`bash"
+            echo "# GitHub Container Registry"
+            echo "docker pull ghcr.io/pavelguzenfeld/ros2-alpine:${TAG#v}"
+            echo ""
+            echo "# Docker Hub (if configured)"
+            echo "docker pull pavelguzenfeld/ros2-alpine:${TAG#v}"
+            echo "\`\`\`"
+            echo ""
+            echo "## Changes"
+            echo ""
+            echo "$CHANGES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.notes.outputs.notes }}
+          generate_release_notes: false

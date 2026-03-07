@@ -5,11 +5,27 @@ Final image size is ~200MB compared to ~2GB for Ubuntu-based ROS 2 images.
 
 ## Quick Start
 
-### Pull from GHCR
+### Pull Pre-built Image
 
 ```bash
+# From GitHub Container Registry
 docker pull ghcr.io/pavelguzenfeld/ros2-alpine:latest
+
+# From Docker Hub
+docker pull pavelguzenfeld/ros2-alpine:latest
+
+# Run
 docker run -it ghcr.io/pavelguzenfeld/ros2-alpine:latest
+```
+
+### Versioned Releases
+
+```bash
+# Specific version
+docker pull ghcr.io/pavelguzenfeld/ros2-alpine:1.0.0
+
+# Latest
+docker pull ghcr.io/pavelguzenfeld/ros2-alpine:latest
 ```
 
 ### Build Locally
@@ -105,16 +121,32 @@ ros2-alpine/
 ├── pipeline.sh          # Build + test orchestration
 └── .github/
     └── workflows/
-        └── build.yml    # CI: lint, build, test, publish to GHCR
+        ├── build.yml    # CI: lint, build, test, publish to GHCR + Docker Hub
+        └── release.yml  # Create GitHub Releases on version tags
 ```
 
 ## CI/CD
 
 GitHub Actions automatically:
-- **On push to main**: builds, tests, and publishes to GHCR
-- **On tags (v\*)**: publishes versioned releases
+- **On push to main**: builds, tests, and publishes to GHCR + Docker Hub
+- **On tags (v\*)**: publishes versioned releases with GitHub Release notes
 - **Weekly**: rebuilds to pick up Alpine security updates
 - **On PRs**: runs linting (ShellCheck, Hadolint)
+
+### Docker Hub Setup
+
+To enable Docker Hub publishing, add these to your GitHub repo settings:
+- **Variable** `DOCKERHUB_USERNAME`: your Docker Hub username
+- **Secret** `DOCKERHUB_TOKEN`: a Docker Hub access token
+
+Without these, images are published to GHCR only.
+
+### Creating a Release
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
 
 ## License
 
