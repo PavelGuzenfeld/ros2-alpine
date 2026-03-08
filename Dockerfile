@@ -88,6 +88,7 @@ RUN mkdir -p src && cd src && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_core.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_defaults.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_dynamic_typesupport.git && \
+    git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_dynamic_typesupport_fastrtps.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_typesupport.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/unique_identifier_msgs.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rcl_interfaces.git && \
