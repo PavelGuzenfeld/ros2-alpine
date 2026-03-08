@@ -150,8 +150,11 @@ RUN colcon build \
         --event-handlers console_direct+
 
 # Build Stage 2: Ament build system
+# Sequential executor prevents setuptools egg-info race conditions
+# between parallel Python package installs sharing site-packages.
 RUN bash -c 'source install/setup.bash && \
     colcon build \
+        --executor sequential \
         --packages-up-to \
             ament_cmake \
             ament_lint_common \
