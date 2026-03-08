@@ -121,6 +121,10 @@ ENV MAKEFLAGS="-j${PARALLEL_JOBS}"
 ENV CFLAGS="-Wno-int-conversion -Wno-incompatible-pointer-types -Wno-error"
 ENV CXXFLAGS="-Wno-error -Wno-deprecated-declarations -Wno-stringop-overread"
 
+# NOTE: All build stages use identical cmake-args to prevent colcon from
+# reconfiguring/rebuilding packages in later stages (which causes setuptools
+# race conditions with parallel egg-info installs).
+
 # Build Stage 1: Foundation packages
 RUN colcon build \
         --packages-select \
@@ -130,6 +134,8 @@ RUN colcon build \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
+            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+            -DPython3_EXECUTABLE=/usr/bin/python3 \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+
@@ -163,6 +169,8 @@ RUN bash -c 'source install/setup.bash && \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
+            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+            -DPython3_EXECUTABLE=/usr/bin/python3 \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+'
@@ -177,6 +185,8 @@ RUN bash -c 'source install/setup.bash && \
             -DBUILD_TESTING=OFF \
             -DBUILD_DOCUMENTATION=OFF \
             -DCOMPILE_EXAMPLES=OFF \
+            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+            -DPython3_EXECUTABLE=/usr/bin/python3 \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+'
@@ -225,6 +235,8 @@ RUN bash -c 'source install/setup.bash && \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
+            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+            -DPython3_EXECUTABLE=/usr/bin/python3 \
             -DCMAKE_C_FLAGS="${CFLAGS}" \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+'
