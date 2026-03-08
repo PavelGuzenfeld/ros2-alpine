@@ -103,6 +103,8 @@ RUN \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/pybind11_vendor.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_typesupport_fastrtps.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros-tooling/libstatistics_collector.git && \
+    git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/console_bridge_vendor.git && \
+    git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros/class_loader.git && \
     git clone --depth 1 --branch v2.14.6 https://github.com/eProsima/Fast-DDS.git && \
     git clone --depth 1 --branch v2.2.6 https://github.com/eProsima/Fast-CDR.git && \
     git clone --depth 1 --branch v1.4.1 https://github.com/eProsima/foonathan_memory_vendor.git
