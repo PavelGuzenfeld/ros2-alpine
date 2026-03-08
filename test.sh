@@ -35,6 +35,18 @@ run_test "Python rclpy import" \
 run_test "Python std_msgs import" \
     'source /opt/ros/jazzy/setup.bash && python3 -c "from std_msgs.msg import String"'
 
+run_test "Python geometry_msgs import" \
+    'source /opt/ros/jazzy/setup.bash && python3 -c "from geometry_msgs.msg import Twist, PoseStamped"'
+
+run_test "Python sensor_msgs import" \
+    'source /opt/ros/jazzy/setup.bash && python3 -c "from sensor_msgs.msg import Image, LaserScan, PointCloud2"'
+
+run_test "Python nav_msgs import" \
+    'source /opt/ros/jazzy/setup.bash && python3 -c "from nav_msgs.msg import Odometry, Path, OccupancyGrid"'
+
+run_test "rclcpp headers present" \
+    'source /opt/ros/jazzy/setup.bash && test -f /opt/ros/jazzy/rclcpp/include/rclcpp/rclcpp/node.hpp'
+
 run_test "Node lifecycle" \
     'source /opt/ros/jazzy/setup.bash && timeout 5 python3 -c "
 import rclpy
@@ -46,12 +58,18 @@ rclpy.shutdown()"'
 run_test "Message creation" \
     'source /opt/ros/jazzy/setup.bash && python3 -c "
 from std_msgs.msg import String
+from geometry_msgs.msg import Twist
 from builtin_interfaces.msg import Time
 msg = String(data=\"hello\")
+twist = Twist()
 t = Time(sec=1, nanosec=0)"'
 
 run_test "ROS 2 CLI" \
     'source /opt/ros/jazzy/setup.bash && ros2 --help'
+
+# shellcheck disable=SC2016
+run_test "Non-root user" \
+    'test "$(whoami)" = "ros"'
 
 TOTAL=$((PASS + FAIL))
 echo ""

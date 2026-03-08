@@ -77,8 +77,11 @@ RUN \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rmw.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rcl.git && \
+    git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rclcpp.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rclpy.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/ros2cli.git && \
+    git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/geometry2.git && \
+    git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/message_filters.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/common_interfaces.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/libyaml_vendor.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/python_cmake_module.git && \
@@ -101,7 +104,7 @@ RUN \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_typesupport_fastrtps.git && \
     git clone --depth 1 --branch v2.14.6 https://github.com/eProsima/Fast-DDS.git && \
     git clone --depth 1 --branch v2.2.6 https://github.com/eProsima/Fast-CDR.git && \
-    git clone --depth 1 https://github.com/eProsima/foonathan_memory_vendor.git
+    git clone --depth 1 --branch v1.4.1 https://github.com/eProsima/foonathan_memory_vendor.git
 
 # Remove test/example/benchmark directories to reduce build scope
 RUN find . -name "*_test" -type d \
@@ -242,16 +245,47 @@ RUN bash -c 'source install/setup.bash && \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+'
 
-# Build Stage 8: Core ROS packages
+# Build Stage 8: Core ROS packages (rclcpp, rclpy, CLI)
 RUN bash -c 'source install/setup.bash && \
     colcon build \
         --packages-up-to \
-            rcutils \
-            rmw \
-            builtin_interfaces \
-            std_msgs \
+            rclcpp \
+            rclcpp_action \
+            rclcpp_components \
+            rclcpp_lifecycle \
             rclpy \
             ros2cli \
+        --packages-skip \
+            libyaml_vendor \
+        --cmake-args \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF \
+            -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+            -DPython3_EXECUTABLE=/usr/bin/python3 \
+            -DCMAKE_C_FLAGS="${CFLAGS}" \
+            -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
+        --event-handlers console_direct+'
+
+# Build Stage 9: Message interfaces and transforms
+RUN bash -c 'source install/setup.bash && \
+    colcon build \
+        --packages-up-to \
+            std_msgs \
+            geometry_msgs \
+            sensor_msgs \
+            nav_msgs \
+            diagnostic_msgs \
+            visualization_msgs \
+            shape_msgs \
+            trajectory_msgs \
+            stereo_msgs \
+            unique_identifier_msgs \
+            action_msgs \
+            tf2 \
+            tf2_ros \
+            tf2_geometry_msgs \
+            tf2_msgs \
+            message_filters \
         --packages-skip \
             libyaml_vendor \
         --cmake-args \
@@ -292,7 +326,8 @@ RUN apk add --no-cache \
     yaml-cpp \
     yaml \
     openssl \
-    lttng-ust
+    lttng-ust \
+    eigen-dev
 
 ENV PYTHONWARNINGS=ignore::UserWarning:setuptools._distutils.dist
 RUN pip3 install --no-cache-dir --break-system-packages --quiet \
@@ -316,7 +351,12 @@ RUN if [ -f /opt/ros/jazzy/setup.bash ]; then \
         chmod +x /opt/ros/jazzy/setup.bash; \
     fi
 
-RUN mkdir -p /workspace/src
+RUN adduser -D -h /home/ros ros && \
+    mkdir -p /workspace/src && \
+    chown -R ros:ros /workspace
+
+USER ros
 WORKDIR /workspace
 
-CMD ["/bin/bash", "-c", "source /opt/ros/jazzy/setup.bash && echo 'ROS 2 Jazzy Alpine ready!' && /bin/bash"]
+SHELL ["/bin/bash", "-c"]
+CMD ["bash", "-c", "source /opt/ros/jazzy/setup.bash && echo 'ROS 2 Jazzy Alpine ready!' && exec bash"]
