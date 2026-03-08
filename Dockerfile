@@ -212,7 +212,7 @@ RUN bash -c 'source install/setup.bash && \
             -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
         --event-handlers console_direct+'
 
-# Build Stage 7: RMW and all fastrtps-dependent packages
+# Build Stage 7: RMW implementations
 RUN bash -c 'source install/setup.bash && \
     colcon build \
         --packages-up-to \
@@ -221,7 +221,6 @@ RUN bash -c 'source install/setup.bash && \
             rmw_fastrtps_dynamic_cpp \
             rosidl_typesupport_fastrtps_cpp \
             rosidl_typesupport_fastrtps_c \
-            rosidl_dynamic_typesupport_fastrtps \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
@@ -241,6 +240,7 @@ RUN bash -c 'source install/setup.bash && \
             ros2cli \
         --packages-skip \
             libyaml_vendor \
+            rosidl_dynamic_typesupport_fastrtps \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
