@@ -87,7 +87,6 @@ RUN mkdir -p src && cd src && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_core.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_defaults.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_dynamic_typesupport.git && \
-    git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_dynamic_typesupport_fastrtps.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_typesupport.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/unique_identifier_msgs.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rcl_interfaces.git && \
@@ -240,7 +239,6 @@ RUN bash -c 'source install/setup.bash && \
             ros2cli \
         --packages-skip \
             libyaml_vendor \
-            rosidl_dynamic_typesupport_fastrtps \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
