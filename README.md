@@ -38,12 +38,14 @@ docker run -it --network host ghcr.io/pavelguzenfeld/ros2-alpine:latest
 
 ## What's Included
 
-- Core ROS 2: rcl, rclpy, rosidl, rmw
-- Standard messages: std_msgs, builtin_interfaces, common_interfaces
-- CLI tools: ros2 topic, ros2 node, ros2 service, etc.
-- Fast-DDS 2.14.6 middleware (pinned for Jazzy compatibility)
-- Python bindings (rclpy)
-- colcon build system
+- **C++ and Python**: rclcpp (with actions, components, lifecycle), rclpy
+- **All common interfaces**: std_msgs, geometry_msgs, sensor_msgs, nav_msgs, diagnostic_msgs, visualization_msgs, shape_msgs, trajectory_msgs, stereo_msgs
+- **Transforms**: tf2, tf2_ros, tf2_geometry_msgs
+- **Middleware**: Fast-DDS 2.14.6 (rmw_fastrtps_cpp)
+- **CLI tools**: ros2 topic, ros2 node, ros2 service, etc.
+- **Build system**: colcon, ament_cmake
+- **Utilities**: message_filters, unique_identifier_msgs, action_msgs
+- **Non-root**: runs as `ros` user by default
 
 ## Usage
 
@@ -87,7 +89,7 @@ docker build --build-arg ALPINE_VERSION=3.21 -t ros2-jazzy-alpine .
 
 ```
 ros2-alpine/
-├── Dockerfile           # Multi-stage build (8 colcon stages + runtime)
+├── Dockerfile           # Multi-stage build (9 colcon stages + runtime)
 ├── build.sh             # Docker build script
 ├── test.sh              # Image validation tests
 ├── pipeline.sh          # Build + test orchestration
@@ -114,8 +116,8 @@ Add to GitHub repo settings:
 ### Creating a Release
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 ## License
