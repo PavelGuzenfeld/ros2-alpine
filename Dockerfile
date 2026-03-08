@@ -99,8 +99,8 @@ RUN mkdir -p src && cd src && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/spdlog_vendor.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/pybind11_vendor.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_typesupport_fastrtps.git && \
-    git clone --depth 1 https://github.com/eProsima/Fast-DDS.git && \
-    git clone --depth 1 https://github.com/eProsima/Fast-CDR.git && \
+    git clone --depth 1 --branch v2.14.6 https://github.com/eProsima/Fast-DDS.git && \
+    git clone --depth 1 --branch v2.2.6 https://github.com/eProsima/Fast-CDR.git && \
     git clone --depth 1 https://github.com/eProsima/foonathan_memory_vendor.git
 
 # Remove test/example/benchmark directories to reduce build scope
@@ -179,7 +179,7 @@ RUN bash -c 'source install/setup.bash && \
 RUN bash -c 'source install/setup.bash && \
     colcon build \
         --packages-up-to \
-            fastdds \
+            fastrtps \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
