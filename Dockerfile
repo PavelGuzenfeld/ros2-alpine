@@ -82,6 +82,7 @@ RUN mkdir -p src && cd src && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/ros2cli.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/common_interfaces.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/libyaml_vendor.git && \
+    git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/python_cmake_module.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_python.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rpyutils.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ros2/rosidl_core.git && \
@@ -198,6 +199,7 @@ RUN bash -c 'source install/setup.bash && \
 RUN bash -c 'source install/setup.bash && \
     colcon build \
         --packages-up-to \
+            python_cmake_module \
             rosidl_generator_py \
             rosidl_adapter \
             rosidl_cmake \
