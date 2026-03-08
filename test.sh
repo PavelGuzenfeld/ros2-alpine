@@ -67,7 +67,7 @@ t = Time(sec=1, nanosec=0)"'
 run_test "ROS 2 CLI" \
     'source /opt/ros/jazzy/setup.bash && ros2 --help'
 
-# shellcheck disable=SC2016 -- $(whoami) must expand inside the container, not on the host
+# shellcheck disable=SC2016
 run_test "Non-root user" \
     'test "$(whoami)" = "ros"'
 
