@@ -44,7 +44,7 @@ RUN apk add --no-cache \
     libc-dev
 
 ENV PYTHONWARNINGS=ignore::UserWarning:setuptools._distutils.dist
-RUN pip3 install --break-system-packages --quiet \
+RUN pip3 install --no-cache-dir --break-system-packages --quiet \
     colcon-common-extensions \
     lark \
     empy \
@@ -61,12 +61,11 @@ RUN pip3 install --break-system-packages --quiet \
     distlib \
     vcstool
 
-WORKDIR /ros2_ws
-
 # Clone ROS 2 source packages pinned to the jazzy branch.
 # Shallow clones (--depth 1) speed up the clone step significantly.
-# eProsima repos don't have a jazzy branch; they use their default branch.
-RUN mkdir -p src && cd src && \
+# eProsima repos pinned to compatible 2.x versions for Jazzy.
+WORKDIR /ros2_ws/src
+RUN \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ament/ament_package.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ament/ament_cmake.git && \
     git clone --depth 1 --branch ${ROS_DISTRO} https://github.com/ament/ament_index.git && \
@@ -105,8 +104,7 @@ RUN mkdir -p src && cd src && \
     git clone --depth 1 https://github.com/eProsima/foonathan_memory_vendor.git
 
 # Remove test/example/benchmark directories to reduce build scope
-RUN cd src && \
-    find . -name "*_test" -type d \
+RUN find . -name "*_test" -type d \
         ! -path "./ament_cmake/ament_cmake_test*" \
         ! -path "./ament_cmake/ament_cmake_gmock*" \
         ! -path "./ament_cmake_ros/rmw_test_fixture*" \
@@ -117,6 +115,8 @@ RUN cd src && \
     find . -name "*demo*" -type d -exec rm -rf {} + 2>/dev/null; \
     find . -name "*benchmark*" -type d -exec rm -rf {} + 2>/dev/null; \
     true
+
+WORKDIR /ros2_ws
 
 ENV MAKEFLAGS="-j${PARALLEL_JOBS}"
 ENV CFLAGS="-Wno-int-conversion -Wno-incompatible-pointer-types -Wno-error"
@@ -295,7 +295,7 @@ RUN apk add --no-cache \
     lttng-ust
 
 ENV PYTHONWARNINGS=ignore::UserWarning:setuptools._distutils.dist
-RUN pip3 install --break-system-packages --quiet \
+RUN pip3 install --no-cache-dir --break-system-packages --quiet \
     lark \
     wheel \
     colcon-common-extensions \

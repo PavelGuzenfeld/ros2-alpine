@@ -1,0 +1,10 @@
+ignored:
+  # Consecutive RUN instructions are intentional for Docker layer caching
+  # during multi-hour ROS 2 from-source builds.
+  - DL3059
+  # Alpine rolling releases make pinning apk versions fragile and
+  # counterproductive (weekly rebuild picks up security updates).
+  - DL3018
+  # Pip versions float intentionally — ROS 2 Python deps must stay
+  # compatible with each other; pinning causes breakage across rebuilds.
+  - DL3013
