@@ -34,17 +34,18 @@ docker run -it --network host ghcr.io/pavelguzenfeld/ros2-alpine:latest
 | Middleware | Fast-DDS 2.14.6 (rmw_fastrtps_cpp) |
 | Python | 3.12 |
 | Image size | ~200MB |
-| Build time | ~3 hours (from source, 2 parallel jobs) |
+| Build time | ~5.5 hours (from source, 2 parallel jobs) |
 
 ## What's Included
 
-- **C++ and Python**: rclcpp (with actions, components, lifecycle), rclpy
-- **All common interfaces**: std_msgs, geometry_msgs, sensor_msgs, nav_msgs, diagnostic_msgs, visualization_msgs, shape_msgs, trajectory_msgs, stereo_msgs
+- **C++ client library**: rclcpp (with actions, components, lifecycle)
+- **Python client library**: rclpy
+- **Common interfaces**: std_msgs, geometry_msgs, sensor_msgs, nav_msgs, diagnostic_msgs, visualization_msgs, shape_msgs, trajectory_msgs, stereo_msgs
 - **Transforms**: tf2, tf2_ros, tf2_geometry_msgs
-- **Middleware**: Fast-DDS 2.14.6 (rmw_fastrtps_cpp)
-- **CLI tools**: ros2 topic, ros2 node, ros2 service, etc.
-- **Build system**: colcon, ament_cmake
-- **Utilities**: message_filters, unique_identifier_msgs, action_msgs
+- **Middleware**: Fast-DDS 2.14.6 with rmw_fastrtps_cpp
+- **CLI tools**: ros2 topic, ros2 node, ros2 service, ros2 param, etc.
+- **Build system**: colcon, ament_cmake, ament_lint
+- **Utilities**: message_filters, unique_identifier_msgs, action_msgs, class_loader
 - **Non-root**: runs as `ros` user by default
 
 ## Usage
@@ -91,9 +92,10 @@ docker build --build-arg ALPINE_VERSION=3.21 -t ros2-jazzy-alpine .
 ros2-alpine/
 ├── Dockerfile           # Multi-stage build (9 colcon stages + runtime)
 ├── build.sh             # Docker build script
-├── test.sh              # Image validation tests
+├── test.sh              # Image validation tests (11 checks)
 ├── pipeline.sh          # Build + test orchestration
-├── .hadolint.yaml       # Hadolint configuration
+├── .hadolint.yaml       # Hadolint lint suppressions
+├── .dockerignore
 └── .github/workflows/
     ├── build.yml        # CI: lint, build, test, publish
     └── release.yml      # GitHub Releases on version tags
@@ -102,12 +104,12 @@ ros2-alpine/
 ## CI/CD
 
 GitHub Actions automatically:
-- **Push to main**: lint, build, test, publish to GHCR (+ Docker Hub if configured)
-- **Tags (v\*)**: publish versioned images + GitHub Release
+- **Push to main**: lint (ShellCheck + Hadolint), build, test, publish to GHCR
+- **Tags (v\*)**: publish versioned images + create GitHub Release
 - **Weekly**: rebuild for Alpine security updates
-- **PRs**: lint only (ShellCheck + Hadolint)
+- **PRs**: lint only
 
-### Docker Hub Setup (Optional)
+### Docker Hub (Optional)
 
 Add to GitHub repo settings:
 - **Variable** `DOCKERHUB_USERNAME`: your Docker Hub username
@@ -116,8 +118,8 @@ Add to GitHub repo settings:
 ### Creating a Release
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
 ## License
